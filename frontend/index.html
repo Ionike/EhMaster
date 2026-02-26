@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manga Viewer</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="css/virtual-grid.css">
+    <link rel="stylesheet" href="css/gallery-view.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Top Bar -->
+        <header id="topbar">
+            <div class="topbar-left">
+                <button id="btn-back" class="topbar-btn" title="Back" disabled>&larr;</button>
+                <div id="breadcrumb"></div>
+            </div>
+            <div class="topbar-center">
+                <input type="text" id="search-input" placeholder="Search titles, tags (e.g. artist:name, female:tag)..." autocomplete="off">
+            </div>
+            <div class="topbar-right">
+                <button id="btn-scan" class="topbar-btn" title="Scan">Scan</button>
+                <button id="btn-settings" class="topbar-btn" title="Settings">&#9881;</button>
+            </div>
+        </header>
+
+        <div id="main-content">
+            <!-- Sidebar -->
+            <aside id="sidebar">
+                <div id="sidebar-header">
+                    <span>Folders</span>
+                    <button id="btn-add-root" class="sidebar-btn" title="Add folder">+</button>
+                </div>
+                <div id="folder-tree"></div>
+            </aside>
+
+            <!-- Content Area -->
+            <main id="content">
+                <!-- Welcome / empty state -->
+                <div id="welcome-screen">
+                    <h2>Manga Viewer</h2>
+                    <p>Add a root folder to get started</p>
+                    <button id="btn-add-root-welcome" class="primary-btn">Add Folder</button>
+                </div>
+
+                <!-- Gallery grid (virtual scrolled) -->
+                <div id="gallery-grid" class="hidden">
+                    <div id="grid-info-bar">
+                        <span id="grid-count"></span>
+                        <select id="sort-select">
+                            <option value="scanned_at:desc">Recently Added</option>
+                            <option value="title:asc">Title A-Z</option>
+                            <option value="title:desc">Title Z-A</option>
+                            <option value="rating:desc">Rating</option>
+                            <option value="posted:desc">Date Posted</option>
+                            <option value="pages:desc">Most Pages</option>
+                        </select>
+                    </div>
+                    <div id="grid-container">
+                        <div id="grid-sentinel"></div>
+                    </div>
+                </div>
+
+                <!-- Gallery detail view -->
+                <div id="gallery-view" class="hidden"></div>
+
+                <!-- Scan progress overlay -->
+                <div id="scan-overlay" class="hidden">
+                    <div class="scan-dialog">
+                        <h3>Scanning...</h3>
+                        <div class="progress-bar">
+                            <div id="scan-progress-fill"></div>
+                        </div>
+                        <p id="scan-progress-text">0 / 0</p>
+                        <p id="scan-current-folder" class="scan-folder"></p>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Settings</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <h4>Root Folders</h4>
+                    <ul id="root-paths-list"></ul>
+                    <button id="btn-add-root-settings" class="primary-btn">Add Folder</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

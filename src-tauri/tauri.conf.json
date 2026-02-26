@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicoulaj/tauri/dev/crates/tauri-config-schema/schema.json",
+  "productName": "Manga Viewer",
+  "version": "0.1.0",
+  "identifier": "com.manga-viewer.app",
+  "build": {
+    "frontendDist": "../frontend"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Manga Viewer",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      },
+      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "plugins": {
+    "dialog": {},
+    "shell": {
+      "open": true
+    }
+  }
+}

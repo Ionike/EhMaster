@@ -1,0 +1,24 @@
+# Rust
+src-tauri/target/
+**/*.rs.bk
+
+# Node
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Tauri
+src-tauri/gen/
+
+# App data
+*.db
