@@ -28,3 +28,5 @@ src-tauri/bundle/
 
 # App data
 *.db
+
+/cookie/

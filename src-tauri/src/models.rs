@@ -102,6 +102,8 @@ pub struct AppSettings {
     pub root_paths: Vec<String>,
     pub thumbnail_width: u32,
     pub watcher_enabled: bool,
+    #[serde(default)]
+    pub cookie_path: String,
 }
 
 impl Default for AppSettings {
@@ -110,6 +112,7 @@ impl Default for AppSettings {
             root_paths: Vec::new(),
             thumbnail_width: 300,
             watcher_enabled: true,
+            cookie_path: String::new(),
         }
     }
 }

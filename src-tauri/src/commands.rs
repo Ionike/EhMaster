@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use crate::fetcher;
 use crate::models::*;
 use crate::scanner;
 use crate::state::AppState;
@@ -418,6 +419,142 @@ pub fn read_thumb(path: String) -> Result<String, String> {
     use base64::Engine;
     let b64 = base64::engine::general_purpose::STANDARD.encode(&data);
     Ok(format!("data:{};base64,{}", mime, b64))
+}
+
+/// Pick a cookie file and copy it to the app data directory.
+#[tauri::command]
+pub async fn set_cookie_file(app: AppHandle, state: State<'_, AppState>) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let file = app
+        .dialog()
+        .file()
+        .add_filter("Cookie files", &["txt"])
+        .blocking_pick_file();
+
+    let source = match file {
+        Some(p) => PathBuf::from(p.to_string()),
+        None => return Err("No file selected".to_string()),
+    };
+
+    // Copy to app data dir as cookie.txt
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Cannot get app data dir: {}", e))?;
+    let _ = fs::create_dir_all(&data_dir);
+    let dest = data_dir.join("cookie.txt");
+
+    fs::copy(&source, &dest).map_err(|e| format!("Failed to copy cookie file: {}", e))?;
+
+    // Clear the settings cookie_path so we use the default app data location
+    {
+        let mut settings = state.settings.lock().unwrap();
+        settings.cookie_path = String::new();
+    }
+    save_settings(&state, &app);
+
+    Ok(dest.to_string_lossy().to_string())
+}
+
+/// Get the resolved cookie file path and whether it exists.
+#[tauri::command]
+pub async fn get_cookie_status(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(String, bool), String> {
+    let settings = state.settings.lock().unwrap();
+    let path = if !settings.cookie_path.is_empty() {
+        PathBuf::from(&settings.cookie_path)
+    } else {
+        app.path()
+            .app_data_dir()
+            .map(|d| d.join("cookie.txt"))
+            .unwrap_or_else(|_| PathBuf::from("cookie.txt"))
+    };
+    let exists = path.exists();
+    Ok((path.to_string_lossy().to_string(), exists))
+}
+
+/// Refresh a gallery's metadata by fetching from ExHentai and rewriting info.txt.
+#[tauri::command]
+pub async fn refresh_gallery(
+    id: i64,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    log::info!("[refresh] Starting refresh for gallery id={}", id);
+
+    let gallery = state
+        .db
+        .get_gallery_by_id(id)
+        .map_err(|e| format!("[refresh] DB error: {}", e))?
+        .ok_or_else(|| "[refresh] Gallery not found".to_string())?;
+
+    log::info!("[refresh] Gallery path={}, url={}", gallery.path, gallery.url);
+
+    if gallery.url.is_empty() {
+        return Err("Gallery has no URL to refresh from".to_string());
+    }
+
+    // Resolve cookie path: settings cookie_path > app_data_dir/cookie.txt
+    let cookie_path = {
+        let settings = state.settings.lock().unwrap();
+        if !settings.cookie_path.is_empty() {
+            PathBuf::from(&settings.cookie_path)
+        } else {
+            app.path()
+                .app_data_dir()
+                .map(|d| d.join("cookie.txt"))
+                .unwrap_or_else(|_| PathBuf::from("cookie.txt"))
+        }
+    };
+
+    log::info!("[refresh] Cookie path: {} (exists={})", cookie_path.display(), cookie_path.exists());
+
+    if !cookie_path.exists() {
+        return Err(format!(
+            "Cookie file not found at: {}. Use Settings to select your cookie file.",
+            cookie_path.display()
+        ));
+    }
+
+    // Fetch from ExHentai
+    log::info!("[refresh] Fetching from URL: {}", gallery.url);
+    let fetched = fetcher::fetch_gallery_info(&gallery.url, &cookie_path)
+        .await
+        .map_err(|e| format!("[refresh] Fetch failed: {}", e))?;
+
+    log::info!("[refresh] Fetched title_en={}", fetched.title_en);
+
+    // Write updated info.txt
+    let info_path = Path::new(&gallery.path).join("info.txt");
+    fetcher::write_info_txt(&info_path, &fetched)
+        .map_err(|e| format!("[refresh] Write info.txt failed: {}", e))?;
+
+    log::info!("[refresh] Wrote info.txt at {}", info_path.display());
+
+    // Re-scan: parse info.txt and upsert to DB
+    let parsed = scanner::parse_info_txt(&info_path)
+        .ok_or_else(|| "[refresh] Failed to re-parse updated info.txt".to_string())?;
+
+    let cache_dir = state.cache_dir.clone();
+    let thumb_width = state.settings.lock().unwrap().thumbnail_width;
+
+    // Regenerate thumbnail
+    let thumb = scanner::get_first_image(Path::new(&gallery.path))
+        .and_then(|img| thumbnail::generate_thumbnail(&img, &cache_dir, thumb_width))
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| gallery.thumb_path.clone());
+
+    let info_mtime = scanner::get_file_mtime(&info_path);
+    let folder_str = normalize_path(Path::new(&gallery.path));
+    state
+        .db
+        .upsert_gallery(&folder_str, &parsed, &thumb, &info_mtime)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 fn urlencoding(s: &str) -> String {

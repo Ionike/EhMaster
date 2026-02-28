@@ -92,6 +92,9 @@ fn main() {
             commands::delete_gallery,
             commands::clear_cache,
             commands::read_thumb,
+            commands::refresh_gallery,
+            commands::set_cookie_file,
+            commands::get_cookie_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

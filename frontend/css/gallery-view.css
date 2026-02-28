@@ -52,8 +52,37 @@
     font-size: 12px;
 }
 
+.gv-url {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
 .gv-url a:hover {
     text-decoration: underline;
+}
+
+.gv-refresh-btn {
+    font-size: 11px;
+    padding: 3px 10px;
+    background: var(--bg-input);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.gv-refresh-btn:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent);
+}
+
+.gv-refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Tags section */

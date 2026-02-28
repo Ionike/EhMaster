@@ -69,6 +69,18 @@ export const api = {
     readThumb(path) {
         return invoke('read_thumb', { path });
     },
+
+    refreshGallery(id) {
+        return invoke('refresh_gallery', { id });
+    },
+
+    setCookieFile() {
+        return invoke('set_cookie_file');
+    },
+
+    getCookieStatus() {
+        return invoke('get_cookie_status');
+    },
 };
 
 /**

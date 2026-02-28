@@ -148,6 +148,21 @@ class App {
             }
         });
 
+        // Set cookie file button
+        document.getElementById('btn-set-cookie')?.addEventListener('click', async () => {
+            const statusEl = document.getElementById('cookie-status');
+            try {
+                const dest = await api.setCookieFile();
+                statusEl.textContent = `Saved to: ${dest}`;
+                statusEl.style.color = 'var(--text-secondary)';
+            } catch (err) {
+                if (String(err) !== 'No file selected') {
+                    statusEl.textContent = `Error: ${err}`;
+                    statusEl.style.color = 'var(--danger, #e55)';
+                }
+            }
+        });
+
         // Clear cache button
         document.getElementById('btn-clear-cache')?.addEventListener('click', async () => {
             const btn = document.getElementById('btn-clear-cache');
@@ -656,6 +671,19 @@ class App {
     }
 
     async refreshSettings() {
+        // Update cookie status
+        try {
+            const [cookiePath, cookieExists] = await api.getCookieStatus();
+            const statusEl = document.getElementById('cookie-status');
+            if (cookieExists) {
+                statusEl.textContent = cookiePath;
+                statusEl.style.color = 'var(--text-secondary)';
+            } else {
+                statusEl.textContent = 'Not configured';
+                statusEl.style.color = 'var(--text-muted)';
+            }
+        } catch (_) {}
+
         const paths = await api.getRootPaths();
         this.rootPathsList.innerHTML = '';
 

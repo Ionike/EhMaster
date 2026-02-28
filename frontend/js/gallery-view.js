@@ -109,6 +109,46 @@ export class GalleryView {
             meta.appendChild(uploader);
         }
 
+        // Refresh button — always shown in meta row
+        const refreshBtn = document.createElement('button');
+        refreshBtn.className = 'gv-refresh-btn';
+        refreshBtn.textContent = 'Refresh';
+        if (gallery.url) {
+            refreshBtn.title = 'Re-fetch metadata from ExHentai';
+            refreshBtn.addEventListener('click', async () => {
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = 'Refreshing...';
+                try {
+                    await api.refreshGallery(gallery.id);
+                    await this.load(gallery.id);
+                } catch (err) {
+                    console.error('[Refresh] Error:', err);
+                    const errMsg = String(err);
+                    refreshBtn.textContent = 'Failed';
+                    refreshBtn.title = errMsg;
+                    // Show error inline so user can see it without hovering
+                    let errEl = refreshBtn.parentElement.querySelector('.gv-refresh-error');
+                    if (!errEl) {
+                        errEl = document.createElement('span');
+                        errEl.className = 'gv-refresh-error';
+                        errEl.style.cssText = 'color:var(--danger,#e55);font-size:11px;margin-left:4px;';
+                        refreshBtn.parentElement.appendChild(errEl);
+                    }
+                    errEl.textContent = errMsg;
+                    setTimeout(() => {
+                        refreshBtn.disabled = false;
+                        refreshBtn.textContent = 'Refresh';
+                        refreshBtn.title = 'Re-fetch metadata from ExHentai';
+                        if (errEl) errEl.remove();
+                    }, 8000);
+                }
+            });
+        } else {
+            refreshBtn.disabled = true;
+            refreshBtn.title = 'No URL — cannot refresh';
+        }
+        meta.appendChild(refreshBtn);
+
         header.appendChild(meta);
 
         // URL link
