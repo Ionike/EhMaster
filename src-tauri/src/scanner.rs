@@ -123,13 +123,21 @@ pub fn find_gallery_folders(root: &Path) -> Vec<PathBuf> {
 
     for entry in WalkDir::new(root)
         .follow_links(true)
+        .max_depth(20)
         .into_iter()
-        .filter_map(|e| e.ok())
     {
-        if entry.file_type().is_dir() {
-            let info_path = entry.path().join("info.txt");
-            if info_path.exists() {
-                galleries.push(entry.path().to_path_buf());
+        match entry {
+            Ok(e) => {
+                if e.file_type().is_dir() {
+                    let info_path = e.path().join("info.txt");
+                    if info_path.exists() {
+                        galleries.push(e.path().to_path_buf());
+                    }
+                }
+            }
+            Err(e) => {
+                // Log errors (e.g. symlink cycles, permission denied) instead of silently ignoring
+                log::warn!("WalkDir error: {}", e);
             }
         }
     }

@@ -32,7 +32,11 @@ export class GalleryView {
             this.render(detail, pages);
         } catch (err) {
             console.error('Failed to load gallery:', err);
-            this.container.innerHTML = `<div style="padding:40px;text-align:center;color:var(--danger);">Error: ${err}</div>`;
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'padding:40px;text-align:center;color:var(--danger);';
+            errorDiv.textContent = `Error: ${err}`;
+            this.container.innerHTML = '';
+            this.container.appendChild(errorDiv);
         }
     }
 

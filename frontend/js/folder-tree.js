@@ -37,13 +37,14 @@ export class FolderTree {
      * Create a tree node DOM element
      */
     createNode(folder, isRoot = false) {
+        const np = folder.path.replace(/\\/g, '/');
         const node = document.createElement('div');
         node.className = 'tree-node';
-        node.dataset.path = folder.path;
+        node.dataset.path = np;
 
         const label = document.createElement('div');
         label.className = 'tree-label';
-        if (this.activePath === folder.path) {
+        if (this.activePath === np) {
             label.classList.add('active');
         }
 
@@ -52,7 +53,7 @@ export class FolderTree {
         toggle.className = 'tree-toggle';
         if (folder.has_children) {
             toggle.textContent = '\u25B6'; // right-pointing triangle
-            if (this.expandedPaths.has(folder.path)) {
+            if (this.expandedPaths.has(np)) {
                 toggle.classList.add('expanded');
             }
         } else {
@@ -78,7 +79,7 @@ export class FolderTree {
         // Children container
         const children = document.createElement('div');
         children.className = 'tree-children';
-        if (!this.expandedPaths.has(folder.path)) {
+        if (!this.expandedPaths.has(np)) {
             children.classList.add('collapsed');
         }
         node.appendChild(children);
@@ -89,30 +90,30 @@ export class FolderTree {
 
             // Toggle expansion
             if (folder.has_children) {
-                const isExpanded = this.expandedPaths.has(folder.path);
+                const isExpanded = this.expandedPaths.has(np);
                 if (isExpanded) {
-                    this.expandedPaths.delete(folder.path);
+                    this.expandedPaths.delete(np);
                     toggle.classList.remove('expanded');
                     children.classList.add('collapsed');
                 } else {
-                    this.expandedPaths.add(folder.path);
+                    this.expandedPaths.add(np);
                     toggle.classList.add('expanded');
                     children.classList.remove('collapsed');
                     // Load children if empty
                     if (children.children.length === 0) {
-                        await this.loadChildren(folder.path, children);
+                        await this.loadChildren(np, children);
                     }
                 }
             }
 
             // Select this folder
-            this.setActive(folder.path);
-            this.onFolderSelect(folder.path);
+            this.setActive(np);
+            this.onFolderSelect(np);
         });
 
         // Auto-load if already expanded
-        if (this.expandedPaths.has(folder.path) && children.children.length === 0) {
-            this.loadChildren(folder.path, children);
+        if (this.expandedPaths.has(np) && children.children.length === 0) {
+            this.loadChildren(np, children);
         }
 
         return node;
@@ -144,12 +145,12 @@ export class FolderTree {
      * Set the active (selected) folder
      */
     setActive(path) {
-        this.activePath = path;
+        this.activePath = path.replace(/\\/g, '/');
         // Update visual state
         this.container.querySelectorAll('.tree-label.active').forEach(el => {
             el.classList.remove('active');
         });
-        const node = this.container.querySelector(`[data-path="${CSS.escape(path)}"] > .tree-label`);
+        const node = this.container.querySelector(`[data-path="${CSS.escape(this.activePath)}"] > .tree-label`);
         if (node) {
             node.classList.add('active');
         }

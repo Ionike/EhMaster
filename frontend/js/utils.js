@@ -37,20 +37,37 @@ export function formatRating(rating) {
 }
 
 /**
- * Parse search input into text query and tag filters
- * Syntax: "free text artist:name female:tag"
+ * Parse search input into text query and tag filters.
+ * Supports: free text, namespace:tag, namespace:"tag with spaces"
+ * Underscores in unquoted tags are converted to spaces for backward compat.
  */
 export function parseSearchInput(input) {
-    const parts = input.trim().split(/\s+/);
     const tags = [];
     const textParts = [];
 
-    for (const part of parts) {
+    // Match quoted tag values (ns:"value") and unquoted tokens
+    const tokenRegex = /(\S+:"[^"]*"|\S+)/g;
+    let match;
+
+    while ((match = tokenRegex.exec(input.trim())) !== null) {
+        const part = match[1];
         const colonIdx = part.indexOf(':');
+
         if (colonIdx > 0 && colonIdx < part.length - 1) {
             const namespace = part.substring(0, colonIdx);
-            const tag = part.substring(colonIdx + 1).replace(/_/g, ' ');
-            tags.push({ namespace, tag });
+            let tag = part.substring(colonIdx + 1);
+
+            // Remove surrounding quotes if present
+            if (tag.startsWith('"') && tag.endsWith('"')) {
+                tag = tag.slice(1, -1);
+            } else {
+                // Backward compat: underscores as spaces in unquoted tags
+                tag = tag.replace(/_/g, ' ');
+            }
+
+            if (tag) {
+                tags.push({ namespace, tag });
+            }
         } else {
             textParts.push(part);
         }

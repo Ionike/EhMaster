@@ -100,7 +100,7 @@ pub async fn get_folder_children(
         let info_path = entry_path.join("info.txt");
         if info_path.exists() {
             // It's a gallery - get from DB or create a summary from folder name
-            let path_str = entry_path.to_string_lossy().to_string();
+            let path_str = normalize_path(&entry_path);
             if let Ok(Some(summary)) = state.db.get_gallery_by_path(&path_str) {
                 galleries.push(summary);
             } else {
@@ -278,7 +278,7 @@ pub async fn start_scan(
 
     // Scan each gallery
     for (i, folder) in gallery_folders.iter().enumerate() {
-        let folder_str = folder.to_string_lossy().to_string();
+        let folder_str = normalize_path(folder);
         let info_path = folder.join("info.txt");
 
         // Check if info.txt has changed since last scan
@@ -357,6 +357,69 @@ pub fn get_asset_url(path: String) -> String {
     format!("asset://localhost/{}", urlencoding(&path))
 }
 
+#[tauri::command]
+pub async fn get_duplicate_galleries(
+    state: State<'_, AppState>,
+) -> Result<DuplicateResult, String> {
+    let by_url = state.db.find_duplicates_by_url().map_err(|e| e.to_string())?;
+    let by_name = state.db.find_duplicates_by_name().map_err(|e| e.to_string())?;
+    Ok(DuplicateResult { by_url, by_name })
+}
+
+#[tauri::command]
+pub async fn delete_gallery(
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let gallery = match state.db.get_gallery_by_id(id).map_err(|e| e.to_string())? {
+        Some(g) => g,
+        None => return Ok(()),
+    };
+
+    state.db.delete_gallery_by_path(&gallery.path).map_err(|e| e.to_string())?;
+
+    // Delete cached thumbnail
+    if !gallery.thumb_path.is_empty() {
+        let thumb = Path::new(&gallery.thumb_path);
+        if thumb.exists() {
+            let _ = fs::remove_file(thumb);
+        }
+    }
+
+    // Delete gallery folder
+    let folder = Path::new(&gallery.path);
+    if folder.is_dir() {
+        fs::remove_dir_all(folder).map_err(|e| {
+            format!("DB entry removed but failed to delete folder: {}", e)
+        })?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clear_cache(_state: State<'_, AppState>) -> Result<CacheCleanResult, String> {
+    Ok(CacheCleanResult { removed: 0, freed_bytes: 0 })
+}
+
+/// Read a thumbnail file and return it as a base64 data URL.
+#[tauri::command]
+pub fn read_thumb(path: String) -> Result<String, String> {
+    let data = fs::read(&path).map_err(|e| format!("Failed to read {}: {}", path, e))?;
+
+    let mime = if path.ends_with(".png") {
+        "image/png"
+    } else if path.ends_with(".webp") {
+        "image/webp"
+    } else {
+        "image/jpeg"
+    };
+
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&data);
+    Ok(format!("data:{};base64,{}", mime, b64))
+}
+
 fn urlencoding(s: &str) -> String {
     let mut encoded = String::new();
     for ch in s.chars() {
@@ -377,6 +440,14 @@ fn urlencoding(s: &str) -> String {
 
 // --- Helper functions ---
 
+/// Normalize a path to use consistent OS-native separators.
+/// On Windows, `fs::read_dir` can produce mixed separators (e.g. `D:/foo\bar`)
+/// while WalkDir produces backslash-only paths. This ensures DB lookups match.
+fn normalize_path(p: &Path) -> String {
+    let cleaned: PathBuf = p.components().collect();
+    cleaned.to_string_lossy().to_string()
+}
+
 fn has_subdirectories(path: &Path) -> bool {
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries.filter_map(|e| e.ok()) {
@@ -395,8 +466,7 @@ fn start_watcher_for_path(path: &str, state: &AppState, app: &AppHandle) {
     let thumb_width = state.settings.lock().unwrap().thumbnail_width;
 
     let handle = watcher::start_watcher(root, db, cache_dir, thumb_width, app.clone());
-    let mut watcher_lock = state.watcher.lock().unwrap();
-    *watcher_lock = Some(handle);
+    state.watchers.lock().unwrap().insert(path.to_string(), handle);
 }
 
 fn save_settings(state: &AppState, app: &AppHandle) {

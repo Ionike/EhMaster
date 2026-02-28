@@ -22,6 +22,7 @@
             </div>
             <div class="topbar-right">
                 <button id="btn-scan" class="topbar-btn" title="Scan">Scan</button>
+                <button id="btn-duplicates" class="topbar-btn" title="Find Duplicates">Dupes</button>
                 <button id="btn-settings" class="topbar-btn" title="Settings">&#9881;</button>
             </div>
         </header>
@@ -91,6 +92,23 @@
                     <h4>Root Folders</h4>
                     <ul id="root-paths-list"></ul>
                     <button id="btn-add-root-settings" class="primary-btn">Add Folder</button>
+
+                    <h4 style="margin-top: 20px;">Cache</h4>
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">Remove orphaned thumbnails not referenced by any gallery.</p>
+                    <button id="btn-clear-cache" class="primary-btn" style="background: var(--danger);">Clear Cache</button>
+                    <span id="cache-clean-result" style="font-size: 12px; color: var(--text-secondary); margin-left: 10px;"></span>
+                </div>
+            </div>
+        </div>
+        <!-- Duplicates Modal -->
+        <div id="duplicates-modal" class="modal hidden">
+            <div class="modal-content duplicates-modal-content">
+                <div class="modal-header">
+                    <h3>Duplicate Galleries</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body" id="duplicates-body">
+                    <p class="text-muted">Checking for duplicates...</p>
                 </div>
             </div>
         </div>

@@ -12,12 +12,14 @@ export class SearchController {
 
         this.currentQuery = null;
         this.isSearching = false;
+        this._searchId = 0;
 
         this._debouncedSearch = debounce(() => this._performSearch(), 300);
 
         this.input.addEventListener('input', () => {
             const value = this.input.value.trim();
             if (value === '') {
+                this._searchId++;
                 this.currentQuery = null;
                 this.onClear();
             } else {
@@ -41,14 +43,22 @@ export class SearchController {
     }
 
     /**
-     * Append a tag filter to the search
+     * Append a tag filter to the search.
+     * Uses quotes for tags with spaces to avoid underscore collision.
      */
     addTag(namespace, tag) {
-        const tagStr = `${namespace}:${tag.replace(/\s+/g, '_')}`;
+        const tagStr = tag.includes(' ')
+            ? `${namespace}:"${tag}"`
+            : `${namespace}:${tag}`;
         const current = this.input.value.trim();
 
-        // Avoid duplicates
-        if (current.includes(tagStr)) return;
+        // Avoid duplicates using the same tokenizer as parseSearchInput
+        // (simple whitespace split breaks quoted tags like ns:"tag with spaces")
+        const tokenRegex = /(\S+:"[^"]*"|\S+)/g;
+        let m;
+        while ((m = tokenRegex.exec(current)) !== null) {
+            if (m[1] === tagStr) return;
+        }
 
         this.input.value = current ? `${current} ${tagStr}` : tagStr;
         this._performSearch();
@@ -56,6 +66,7 @@ export class SearchController {
 
     clear() {
         this.input.value = '';
+        this._searchId++;
         this.currentQuery = null;
         this.onClear();
     }
@@ -80,15 +91,22 @@ export class SearchController {
             limit: 200,
         };
 
+        // Increment search ID to detect stale responses
+        const id = ++this._searchId;
         this.isSearching = true;
 
         try {
             const result = await api.searchGalleries(this.currentQuery);
-            this.onResults(result);
+            // Only apply results if this is still the latest search
+            if (id === this._searchId) {
+                this.onResults(result);
+            }
         } catch (err) {
             console.error('Search error:', err);
         } finally {
-            this.isSearching = false;
+            if (id === this._searchId) {
+                this.isSearching = false;
+            }
         }
     }
 

@@ -36,13 +36,13 @@ fn main() {
             // Create app state
             let state = AppState::new(db, cache_dir.clone());
             {
-                let mut s = state.settings.lock().unwrap();
+                let mut s = state.settings.lock().unwrap_or_else(|e| e.into_inner());
                 *s = settings;
             }
 
             // Start file watchers for configured root paths
             {
-                let settings = state.settings.lock().unwrap();
+                let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
                 let paths = settings.root_paths.clone();
                 let thumb_width = settings.thumbnail_width;
                 drop(settings);
@@ -58,13 +58,21 @@ fn main() {
                             thumb_width,
                             app.handle().clone(),
                         );
-                        let mut watcher_lock = state.watcher.lock().unwrap();
-                        *watcher_lock = Some(handle);
+                        state.watchers.lock().unwrap_or_else(|e| e.into_inner()).insert(path.clone(), handle);
                     }
                 }
             }
 
             app.manage(state);
+
+            // Open DevTools in debug builds
+            #[cfg(debug_assertions)]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.open_devtools();
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -80,6 +88,10 @@ fn main() {
             commands::start_scan,
             commands::get_scan_status,
             commands::get_asset_url,
+            commands::get_duplicate_galleries,
+            commands::delete_gallery,
+            commands::clear_cache,
+            commands::read_thumb,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

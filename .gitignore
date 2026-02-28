@@ -19,6 +19,12 @@ Desktop.ini
 
 # Tauri
 src-tauri/gen/
+src-tauri/target/release/
+src-tauri/target/debug/
+
+# Tauri build output
+src-tauri/WixTools/
+src-tauri/bundle/
 
 # App data
 *.db

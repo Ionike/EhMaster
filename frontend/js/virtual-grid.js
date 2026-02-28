@@ -1,9 +1,11 @@
-import { assetUrl } from './api.js';
+import { loadThumb } from './api.js';
 import { getCategoryClass, formatRating } from './utils.js';
 
 /**
  * Virtual scrolling grid component.
  * Only renders items visible in the viewport + a buffer for smooth scrolling.
+ * Galleries with horizontal thumbnails (width > height) span 2 columns.
+ * Wideness is detected on the frontend when images load, triggering re-layout.
  */
 export class VirtualGrid {
     constructor(container, sentinel, options = {}) {
@@ -18,7 +20,15 @@ export class VirtualGrid {
         this.folders = [];      // folder items (shown before galleries)
         this.pool = new Map();  // index -> DOM node
         this.columns = 1;
-        this.renderedRange = { start: -1, end: -1 };
+
+        // Layout data (computed by _computeLayout)
+        this._layoutPositions = []; // [{col, row, colSpan}, ...]
+        this._rowItems = [];        // row -> [itemIndex, ...]
+        this._galleryRowCount = 0;
+
+        // Track which gallery indices are known to be wide (detected on image load)
+        this._wideSet = new Set();
+        this._relayoutTimer = null;
 
         this.onGalleryClick = options.onGalleryClick || (() => {});
         this.onFolderClick = options.onFolderClick || (() => {});
@@ -26,6 +36,7 @@ export class VirtualGrid {
         this._scrollHandler = this._onScroll.bind(this);
         this._resizeHandler = this._onResize.bind(this);
         this._ticking = false;
+        this._resizeTicking = false;
 
         this.container.addEventListener('scroll', this._scrollHandler);
         window.addEventListener('resize', this._resizeHandler);
@@ -37,9 +48,10 @@ export class VirtualGrid {
     setItems(galleries, folders = []) {
         this.items = galleries;
         this.folders = folders;
+        this._wideSet.clear();
         this.pool.forEach(node => node.remove());
         this.pool.clear();
-        this.renderedRange = { start: -1, end: -1 };
+        this.container.scrollTop = 0;
         this._layout();
     }
 
@@ -51,19 +63,114 @@ export class VirtualGrid {
     }
 
     /**
+     * Called when a thumbnail finishes loading and is detected as wide.
+     * Batches re-layouts so multiple detections in quick succession
+     * only trigger one reflow.
+     */
+    _markWide(index) {
+        if (this._wideSet.has(index)) return;
+        this._wideSet.add(index);
+        if (this._relayoutTimer) return; // already scheduled
+        this._relayoutTimer = requestAnimationFrame(() => {
+            this._relayoutTimer = null;
+            const scrollTop = this.container.scrollTop;
+            this.pool.forEach(node => node.remove());
+            this.pool.clear();
+            this._layout();
+            this.container.scrollTop = scrollTop;
+        });
+    }
+
+    /**
+     * Greedy bin-packing layout: assigns each gallery a (col, row, colSpan).
+     * Wide galleries span 2 columns. Gaps are filled by subsequent normal items.
+     */
+    _computeLayout() {
+        const items = this.items;
+        const cols = this.columns;
+        const wideSet = this._wideSet;
+        const grid = []; // sparse array of rows, each row is bool[cols]
+        const positions = new Array(items.length);
+        const rowItems = [];
+        let maxRow = 0;
+        let firstOpenRow = 0;
+
+        function getRow(r) {
+            if (!grid[r]) grid[r] = new Array(cols).fill(false);
+            return grid[r];
+        }
+
+        function findPosition(span) {
+            for (let r = firstOpenRow; ; r++) {
+                const row = getRow(r);
+                for (let c = 0; c <= cols - span; c++) {
+                    let fits = true;
+                    for (let s = 0; s < span; s++) {
+                        if (row[c + s]) { fits = false; break; }
+                    }
+                    if (fits) return { row: r, col: c };
+                }
+            }
+        }
+
+        for (let i = 0; i < items.length; i++) {
+            const isWide = wideSet.has(i);
+            const span = (isWide && cols > 1) ? 2 : 1;
+
+            const pos = findPosition(span);
+            positions[i] = { col: pos.col, row: pos.row, colSpan: span };
+
+            // Mark cells as occupied
+            const rowArr = getRow(pos.row);
+            for (let s = 0; s < span; s++) {
+                rowArr[pos.col + s] = true;
+            }
+
+            // Build row-to-items index
+            if (!rowItems[pos.row]) rowItems[pos.row] = [];
+            rowItems[pos.row].push(i);
+
+            if (pos.row > maxRow) maxRow = pos.row;
+
+            // Advance firstOpenRow past fully-filled rows
+            while (firstOpenRow <= maxRow) {
+                const fr = getRow(firstOpenRow);
+                if (fr.every(Boolean)) {
+                    firstOpenRow++;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        this._layoutPositions = positions;
+        this._rowItems = rowItems;
+        this._galleryRowCount = items.length > 0 ? maxRow + 1 : 0;
+    }
+
+    /**
      * Calculate layout and render visible items
      */
     _layout() {
         const containerWidth = this.container.clientWidth - this.gap * 2;
-        this.columns = Math.max(1, Math.floor((containerWidth + this.gap) / this.cardWidth));
+        const newColumns = Math.max(1, Math.floor((containerWidth + this.gap) / this.cardWidth));
+
+        // If column count changed, clear pool so nodes get recreated at correct positions
+        if (newColumns !== this.columns) {
+            this.pool.forEach(node => node.remove());
+            this.pool.clear();
+        }
+        this.columns = newColumns;
+
+        // Compute bin-packing layout
+        this._computeLayout();
 
         // Folder rows (shorter height)
         const folderRows = Math.ceil(this.folders.length / this.columns);
         const folderHeight = this.folders.length > 0 ? folderRows * 136 : 0;
 
-        // Gallery rows
-        const galleryRows = Math.ceil(this.items.length / this.columns);
-        const totalHeight = folderHeight + galleryRows * this.cardHeight + this.gap;
+        // Gallery rows from layout
+        const totalHeight = folderHeight + this._galleryRowCount * this.cardHeight + this.gap;
 
         this.sentinel.style.height = `${totalHeight}px`;
         this._folderHeight = folderHeight;
@@ -83,37 +190,40 @@ export class VirtualGrid {
     }
 
     _onResize() {
-        this._layout();
+        if (!this._resizeTicking) {
+            requestAnimationFrame(() => {
+                this._layout();
+                this._resizeTicking = false;
+            });
+            this._resizeTicking = true;
+        }
     }
 
     _render() {
         const scrollTop = this.container.scrollTop;
         const viewportHeight = this.container.clientHeight;
 
-        // Calculate visible folder range
-        const folderRowHeight = 136;
-        const folderStart = 0;
-        const folderEnd = this.folders.length;
-
-        // Calculate visible gallery range
+        // Calculate visible gallery row range
         let galleryStartRow, galleryEndRow;
         if (scrollTop < this._folderHeight) {
             galleryStartRow = 0;
         } else {
             galleryStartRow = Math.floor((scrollTop - this._folderHeight) / this.cardHeight);
         }
-        galleryEndRow = Math.ceil((scrollTop + viewportHeight - this._folderHeight) / this.cardHeight);
+        galleryEndRow = Math.max(0, Math.ceil((scrollTop + viewportHeight - this._folderHeight) / this.cardHeight));
 
         galleryStartRow = Math.max(0, galleryStartRow - this.buffer);
-        galleryEndRow = Math.min(
-            Math.ceil(this.items.length / this.columns),
-            galleryEndRow + this.buffer
-        );
+        galleryEndRow = Math.min(this._galleryRowCount, galleryEndRow + this.buffer);
 
-        const galleryStartIdx = galleryStartRow * this.columns;
-        const galleryEndIdx = Math.min(this.items.length, galleryEndRow * this.columns);
-
-        const newRange = { start: galleryStartIdx, end: galleryEndIdx };
+        // Collect visible gallery indices from row-to-items index
+        const visibleIndices = new Set();
+        for (let r = galleryStartRow; r < galleryEndRow; r++) {
+            if (this._rowItems[r]) {
+                for (const idx of this._rowItems[r]) {
+                    visibleIndices.add(idx);
+                }
+            }
+        }
 
         // Render folders (always render all since they're few)
         for (let i = 0; i < this.folders.length; i++) {
@@ -129,14 +239,14 @@ export class VirtualGrid {
         for (const [key, node] of this.pool) {
             if (key.startsWith('f_')) continue;
             const idx = parseInt(key);
-            if (idx < newRange.start || idx >= newRange.end) {
+            if (!visibleIndices.has(idx)) {
                 node.remove();
                 this.pool.delete(key);
             }
         }
 
-        // Add in-range gallery nodes
-        for (let i = newRange.start; i < newRange.end; i++) {
+        // Add visible gallery nodes
+        for (const i of visibleIndices) {
             const key = `${i}`;
             if (!this.pool.has(key)) {
                 const node = this._createGalleryNode(this.items[i], i);
@@ -144,38 +254,45 @@ export class VirtualGrid {
                 this.pool.set(key, node);
             }
         }
-
-        this.renderedRange = newRange;
     }
 
     _createGalleryNode(gallery, index) {
-        const col = index % this.columns;
-        const row = Math.floor(index / this.columns);
-        const x = this.gap + col * this.cardWidth;
-        const y = this._folderHeight + row * this.cardHeight;
+        const pos = this._layoutPositions[index];
+        const x = this.gap + pos.col * this.cardWidth;
+        const y = this._folderHeight + pos.row * this.cardHeight;
+        const cardW = pos.colSpan * this.cardWidth - this.gap;
 
         const card = document.createElement('div');
-        card.className = 'gallery-card';
-        card.style.transform = `translate(${x}px, ${y}px)`;
-        card.style.width = `${this.cardWidth - this.gap}px`;
+        card.className = pos.colSpan > 1 ? 'gallery-card gallery-card-wide' : 'gallery-card';
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
+        card.style.width = `${cardW}px`;
 
         const thumb = document.createElement('div');
         thumb.className = 'card-thumb';
 
         if (gallery.thumb_path) {
+            // Load thumbnail via IPC (returns base64 data URL)
             const img = document.createElement('img');
-            img.loading = 'lazy';
-            img.src = assetUrl(gallery.thumb_path);
             img.alt = gallery.title_en || gallery.folder_name;
-            img.onerror = () => { img.style.display = 'none'; };
             thumb.appendChild(img);
+            loadThumb(gallery.thumb_path).then(dataUrl => {
+                if (dataUrl) {
+                    img.src = dataUrl;
+                    img.onload = () => {
+                        if (img.naturalWidth > img.naturalHeight) {
+                            this._markWide(index);
+                        }
+                    };
+                } else {
+                    this._showPlaceholder(thumb, img);
+                }
+            });
+            img.onerror = () => {
+                this._showPlaceholder(thumb, img);
+            };
         } else {
-            const placeholder = document.createElement('div');
-            placeholder.className = 'placeholder';
-            placeholder.textContent = '\uD83D\uDDBC\uFE0F';
-            placeholder.style.fontSize = '48px';
-            placeholder.style.opacity = '0.3';
-            thumb.appendChild(placeholder);
+            this._appendPlaceholder(thumb);
         }
 
         const info = document.createElement('div');
@@ -230,7 +347,8 @@ export class VirtualGrid {
 
         const card = document.createElement('div');
         card.className = 'folder-card';
-        card.style.transform = `translate(${x}px, ${y}px)`;
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
         card.style.width = `${this.cardWidth - this.gap}px`;
 
         const icon = document.createElement('div');
@@ -250,6 +368,20 @@ export class VirtualGrid {
         });
 
         return card;
+    }
+
+    _showPlaceholder(thumb, img) {
+        img.remove();
+        this._appendPlaceholder(thumb);
+    }
+
+    _appendPlaceholder(thumb) {
+        const ph = document.createElement('div');
+        ph.className = 'placeholder';
+        ph.textContent = '\uD83D\uDDBC\uFE0F';
+        ph.style.fontSize = '48px';
+        ph.style.opacity = '0.3';
+        thumb.appendChild(ph);
     }
 
     destroy() {

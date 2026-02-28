@@ -443,6 +443,86 @@ impl Database {
         Ok(paths)
     }
 
+    pub fn find_duplicates_by_url(&self) -> SqlResult<Vec<Vec<GallerySummary>>> {
+        let conn = self.conn.lock().unwrap();
+        // Find URLs that appear more than once (ignoring empty URLs)
+        let mut group_stmt = conn.prepare(
+            "SELECT url FROM galleries WHERE url != '' GROUP BY url HAVING COUNT(*) > 1",
+        )?;
+        let urls: Vec<String> = group_stmt
+            .query_map([], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut results = Vec::new();
+        let mut detail_stmt = conn.prepare(
+            "SELECT id, title_en, title_jp, category, page_count, rating, thumb_path, folder_name, path
+             FROM galleries WHERE url = ?1 ORDER BY id",
+        )?;
+        for url in &urls {
+            let group: Vec<GallerySummary> = detail_stmt
+                .query_map(params![url], |row| {
+                    Ok(GallerySummary {
+                        id: row.get(0)?,
+                        title_en: row.get(1)?,
+                        title_jp: row.get(2)?,
+                        category: row.get(3)?,
+                        page_count: row.get(4)?,
+                        rating: row.get(5)?,
+                        thumb_path: row.get(6)?,
+                        folder_name: row.get(7)?,
+                        path: row.get(8)?,
+                    })
+                })?
+                .filter_map(|r| r.ok())
+                .collect();
+            if group.len() > 1 {
+                results.push(group);
+            }
+        }
+        Ok(results)
+    }
+
+    pub fn find_duplicates_by_name(&self) -> SqlResult<Vec<Vec<GallerySummary>>> {
+        let conn = self.conn.lock().unwrap();
+        // Find title_en values that appear more than once (ignoring empty titles)
+        let mut group_stmt = conn.prepare(
+            "SELECT title_en FROM galleries WHERE title_en != '' GROUP BY title_en HAVING COUNT(*) > 1",
+        )?;
+        let names: Vec<String> = group_stmt
+            .query_map([], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut results = Vec::new();
+        let mut detail_stmt = conn.prepare(
+            "SELECT id, title_en, title_jp, category, page_count, rating, thumb_path, folder_name, path
+             FROM galleries WHERE title_en = ?1 ORDER BY id",
+        )?;
+        for name in &names {
+            let group: Vec<GallerySummary> = detail_stmt
+                .query_map(params![name], |row| {
+                    Ok(GallerySummary {
+                        id: row.get(0)?,
+                        title_en: row.get(1)?,
+                        title_jp: row.get(2)?,
+                        category: row.get(3)?,
+                        page_count: row.get(4)?,
+                        rating: row.get(5)?,
+                        thumb_path: row.get(6)?,
+                        folder_name: row.get(7)?,
+                        path: row.get(8)?,
+                    })
+                })?
+                .filter_map(|r| r.ok())
+                .collect();
+            if group.len() > 1 {
+                results.push(group);
+            }
+        }
+        Ok(results)
+    }
+
     pub fn update_thumb_path(&self, gallery_id: i64, thumb_path: &str) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(

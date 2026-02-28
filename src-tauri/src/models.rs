@@ -114,6 +114,18 @@ impl Default for AppSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuplicateResult {
+    pub by_url: Vec<Vec<GallerySummary>>,
+    pub by_name: Vec<Vec<GallerySummary>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheCleanResult {
+    pub removed: u64,
+    pub freed_bytes: u64,
+}
+
 /// Parsed info.txt data before insertion into DB
 #[derive(Debug, Clone)]
 pub struct ParsedGallery {

@@ -42,7 +42,10 @@ pub fn generate_thumbnail(
         return None;
     }
 
-    let new_width = max_width.min(w);
+    // For horizontal images (w > h), use double the max_width so they stay
+    // sharp when displayed spanning 2 grid columns.
+    let effective_max = if w > h { max_width * 2 } else { max_width };
+    let new_width = effective_max.min(w);
     let new_height = (h as f64 * new_width as f64 / w as f64) as u32;
 
     let thumbnail = img.resize(new_width, new_height, FilterType::Lanczos3);
