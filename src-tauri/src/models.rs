@@ -104,6 +104,12 @@ pub struct AppSettings {
     pub watcher_enabled: bool,
     #[serde(default)]
     pub cookie_path: String,
+    #[serde(default = "default_title_pref")]
+    pub title_pref: String,
+}
+
+fn default_title_pref() -> String {
+    "en".to_string()
 }
 
 impl Default for AppSettings {
@@ -113,6 +119,7 @@ impl Default for AppSettings {
             thumbnail_width: 300,
             watcher_enabled: true,
             cookie_path: String::new(),
+            title_pref: "en".to_string(),
         }
     }
 }

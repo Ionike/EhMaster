@@ -557,6 +557,116 @@ pub async fn refresh_gallery(
     Ok(())
 }
 
+/// Batch-refresh multiple galleries from ExHentai.
+#[tauri::command]
+pub async fn batch_refresh_galleries(
+    ids: Vec<i64>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let total = ids.len();
+
+    // Resolve cookie path once
+    let cookie_path = {
+        let settings = state.settings.lock().unwrap();
+        if !settings.cookie_path.is_empty() {
+            PathBuf::from(&settings.cookie_path)
+        } else {
+            app.path()
+                .app_data_dir()
+                .map(|d| d.join("cookie.txt"))
+                .unwrap_or_else(|_| PathBuf::from("cookie.txt"))
+        }
+    };
+
+    if !cookie_path.exists() {
+        return Err(format!(
+            "Cookie file not found at: {}. Use Settings to select your cookie file.",
+            cookie_path.display()
+        ));
+    }
+
+    let cache_dir = state.cache_dir.clone();
+    let thumb_width = state.settings.lock().unwrap().thumbnail_width;
+
+    for (i, id) in ids.iter().enumerate() {
+        let gallery = match state.db.get_gallery_by_id(*id) {
+            Ok(Some(g)) => g,
+            _ => {
+                let _ = app.emit("batch-refresh-progress", serde_json::json!({
+                    "done": i + 1, "total": total, "current_title": "?"
+                }));
+                continue;
+            }
+        };
+
+        let title = if !gallery.title_en.is_empty() {
+            gallery.title_en.clone()
+        } else {
+            gallery.folder_name.clone()
+        };
+
+        let _ = app.emit("batch-refresh-progress", serde_json::json!({
+            "done": i, "total": total, "current_title": title
+        }));
+
+        if gallery.url.is_empty() {
+            let _ = app.emit("batch-refresh-progress", serde_json::json!({
+                "done": i + 1, "total": total, "current_title": title
+            }));
+            continue;
+        }
+
+        match fetcher::fetch_gallery_info(&gallery.url, &cookie_path).await {
+            Ok(fetched) => {
+                let info_path = Path::new(&gallery.path).join("info.txt");
+                let _ = fetcher::write_info_txt(&info_path, &fetched);
+
+                if let Some(parsed) = scanner::parse_info_txt(&info_path) {
+                    let thumb = scanner::get_first_image(Path::new(&gallery.path))
+                        .and_then(|img| thumbnail::generate_thumbnail(&img, &cache_dir, thumb_width))
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|| gallery.thumb_path.clone());
+
+                    let info_mtime = scanner::get_file_mtime(&info_path);
+                    let folder_str = normalize_path(Path::new(&gallery.path));
+                    let _ = state.db.upsert_gallery(&folder_str, &parsed, &thumb, &info_mtime);
+                }
+            }
+            Err(e) => {
+                log::warn!("[batch-refresh] Failed for gallery {}: {}", id, e);
+            }
+        }
+
+        let _ = app.emit("batch-refresh-progress", serde_json::json!({
+            "done": i + 1, "total": total, "current_title": title
+        }));
+    }
+
+    let _ = app.emit("batch-refresh-complete", serde_json::json!({ "total": total }));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_title_pref(
+    pref: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    {
+        let mut settings = state.settings.lock().unwrap();
+        settings.title_pref = pref;
+    }
+    save_settings(&state, &app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_title_pref(state: State<'_, AppState>) -> Result<String, String> {
+    let settings = state.settings.lock().unwrap();
+    Ok(settings.title_pref.clone())
+}
+
 fn urlencoding(s: &str) -> String {
     let mut encoded = String::new();
     for ch in s.chars() {

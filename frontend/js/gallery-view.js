@@ -1,5 +1,5 @@
 import { api, assetUrl } from './api.js';
-import { getCategoryClass, formatRating } from './utils.js';
+import { getCategoryClass, formatRating, getDisplayTitle } from './utils.js';
 
 /**
  * Gallery detail view - shows all pages of a gallery
@@ -7,6 +7,7 @@ import { getCategoryClass, formatRating } from './utils.js';
 export class GalleryView {
     constructor(container, options = {}) {
         this.container = container;
+        this.titlePref = options.titlePref || 'en';
         this.onTagClick = options.onTagClick || (() => {});
         this.onBack = options.onBack || (() => {});
     }
@@ -51,20 +52,36 @@ export class GalleryView {
         const header = document.createElement('div');
         header.className = 'gv-header';
 
-        // Titles
+        // Titles — order depends on title preference
         const titles = document.createElement('div');
         titles.className = 'gv-titles';
 
-        const titleEn = document.createElement('div');
-        titleEn.className = 'gv-title-en';
-        titleEn.textContent = gallery.title_en || gallery.folder_name;
-        titles.appendChild(titleEn);
+        if (this.titlePref === 'jp') {
+            // JP first (large), EN second (small)
+            const primaryTitle = document.createElement('div');
+            primaryTitle.className = 'gv-title-en';
+            primaryTitle.textContent = gallery.title_jp || gallery.title_en || gallery.folder_name;
+            titles.appendChild(primaryTitle);
 
-        if (gallery.title_jp) {
-            const titleJp = document.createElement('div');
-            titleJp.className = 'gv-title-jp';
-            titleJp.textContent = gallery.title_jp;
-            titles.appendChild(titleJp);
+            if (gallery.title_en && gallery.title_jp) {
+                const secondaryTitle = document.createElement('div');
+                secondaryTitle.className = 'gv-title-jp';
+                secondaryTitle.textContent = gallery.title_en;
+                titles.appendChild(secondaryTitle);
+            }
+        } else {
+            // EN first (large), JP second (small) — default
+            const primaryTitle = document.createElement('div');
+            primaryTitle.className = 'gv-title-en';
+            primaryTitle.textContent = gallery.title_en || gallery.folder_name;
+            titles.appendChild(primaryTitle);
+
+            if (gallery.title_jp) {
+                const secondaryTitle = document.createElement('div');
+                secondaryTitle.className = 'gv-title-jp';
+                secondaryTitle.textContent = gallery.title_jp;
+                titles.appendChild(secondaryTitle);
+            }
         }
 
         header.appendChild(titles);

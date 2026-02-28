@@ -80,6 +80,19 @@ export function parseSearchInput(input) {
 }
 
 /**
+ * Get the display title based on title preference.
+ * @param {object} gallery - Gallery object with title_en, title_jp, folder_name
+ * @param {string} pref - "en" or "jp"
+ * @returns {string}
+ */
+export function getDisplayTitle(gallery, pref) {
+    if (pref === 'jp') {
+        return gallery.title_jp || gallery.title_en || gallery.folder_name;
+    }
+    return gallery.title_en || gallery.folder_name;
+}
+
+/**
  * Convert backslashes to forward slashes
  */
 export function normalizePath(path) {

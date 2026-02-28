@@ -21,8 +21,6 @@
                 <input type="text" id="search-input" placeholder="Search titles, tags (e.g. artist:name, female:tag)..." autocomplete="off">
             </div>
             <div class="topbar-right">
-                <button id="btn-scan" class="topbar-btn" title="Scan">Scan</button>
-                <button id="btn-duplicates" class="topbar-btn" title="Find Duplicates">Dupes</button>
                 <button id="btn-settings" class="topbar-btn" title="Settings">&#9881;</button>
             </div>
         </header>
@@ -92,6 +90,19 @@
                     <h4>Root Folders</h4>
                     <ul id="root-paths-list"></ul>
                     <button id="btn-add-root-settings" class="primary-btn">Add Folder</button>
+
+                    <h4 style="margin-top: 20px;">Display</h4>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <span style="font-size: 13px; color: var(--text-secondary);">Title Language</span>
+                        <button id="btn-title-toggle" class="primary-btn" style="min-width: 50px;">EN</button>
+                    </div>
+
+                    <h4 style="margin-top: 20px;">Actions</h4>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px;">
+                        <button id="btn-scan" class="primary-btn">Scan All</button>
+                        <button id="btn-duplicates" class="primary-btn">Find Duplicates</button>
+                        <button id="btn-refresh-all" class="primary-btn">Refresh All from ExHentai</button>
+                    </div>
 
                     <h4 style="margin-top: 20px;">ExHentai Cookie</h4>
                     <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">Required for the Refresh button. Select a Netscape cookie.txt file.</p>

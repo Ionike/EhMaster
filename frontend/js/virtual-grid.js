@@ -1,5 +1,5 @@
 import { loadThumb } from './api.js';
-import { getCategoryClass, formatRating } from './utils.js';
+import { getCategoryClass, formatRating, getDisplayTitle } from './utils.js';
 
 /**
  * Virtual scrolling grid component.
@@ -30,6 +30,7 @@ export class VirtualGrid {
         this._wideSet = new Set();
         this._relayoutTimer = null;
 
+        this.titlePref = options.titlePref || 'en';
         this.onGalleryClick = options.onGalleryClick || (() => {});
         this.onFolderClick = options.onFolderClick || (() => {});
 
@@ -300,8 +301,9 @@ export class VirtualGrid {
 
         const title = document.createElement('div');
         title.className = 'card-title';
-        title.textContent = gallery.title_en || gallery.folder_name;
-        title.title = gallery.title_en || gallery.folder_name;
+        const displayTitle = getDisplayTitle(gallery, this.titlePref);
+        title.textContent = displayTitle;
+        title.title = displayTitle;
 
         const meta = document.createElement('div');
         meta.className = 'card-meta';

@@ -4,6 +4,7 @@ import { FolderTree } from './folder-tree.js';
 import { VirtualGrid } from './virtual-grid.js';
 import { GalleryView } from './gallery-view.js';
 import { SearchController } from './search.js';
+import { getDisplayTitle } from './utils.js';
 
 /**
  * Main application controller
@@ -36,6 +37,7 @@ class App {
         this.isSearchMode = false;
         this._navId = 0;
         this._scanQueue = [];
+        this.titlePref = 'en';
 
         // Initialize components
         this.folderTree = new FolderTree(
@@ -78,6 +80,14 @@ class App {
     }
 
     async init() {
+        // Load title preference
+        try {
+            this.titlePref = await api.getTitlePref();
+        } catch (_) {}
+        this.virtualGrid.titlePref = this.titlePref;
+        this.galleryView.titlePref = this.titlePref;
+        this._updateTitleToggleBtn();
+
         const paths = await api.getRootPaths();
         if (paths.length > 0) {
             this.welcomeScreen.classList.add('hidden');
@@ -111,6 +121,7 @@ class App {
 
         // Scan button — queue all root paths and process them one at a time
         document.getElementById('btn-scan').addEventListener('click', async () => {
+            this.settingsModal.classList.add('hidden');
             const paths = await api.getRootPaths();
             if (paths.length > 0) {
                 this._scanQueue = paths.slice(1);
@@ -120,6 +131,7 @@ class App {
 
         // Duplicates button
         document.getElementById('btn-duplicates').addEventListener('click', () => {
+            this.settingsModal.classList.add('hidden');
             this.showDuplicates();
         });
 
@@ -178,6 +190,17 @@ class App {
             }
             btn.disabled = false;
             btn.textContent = 'Clear Cache';
+        });
+
+        // Title preference toggle (EN/JP)
+        document.getElementById('btn-title-toggle')?.addEventListener('click', () => {
+            this.toggleTitlePref();
+        });
+
+        // Batch refresh button
+        document.getElementById('btn-refresh-all')?.addEventListener('click', () => {
+            this.settingsModal.classList.add('hidden');
+            this.batchRefreshCurrentGalleries();
         });
 
         // Back button
@@ -246,6 +269,19 @@ class App {
             this._refreshCurrentView();
         });
 
+        onEvent('batch-refresh-progress', (data) => {
+            this.scanOverlay.classList.remove('hidden');
+            const pct = data.total > 0 ? (data.done / data.total) * 100 : 0;
+            this.scanProgressFill.style.width = `${pct}%`;
+            this.scanProgressText.textContent = `${data.done} / ${data.total}`;
+            this.scanCurrentFolder.textContent = data.current_title || '';
+        });
+
+        onEvent('batch-refresh-complete', () => {
+            this.scanOverlay.classList.add('hidden');
+            this._refreshCurrentView();
+        });
+
         onEvent('watcher-update', (data) => {
             this._refreshCurrentView();
         });
@@ -285,8 +321,8 @@ class App {
                     va = a.page_count; vb = b.page_count;
                     break;
                 case 'title':
-                    va = (a.title_en || a.folder_name).toLowerCase();
-                    vb = (b.title_en || b.folder_name).toLowerCase();
+                    va = getDisplayTitle(a, this.titlePref).toLowerCase();
+                    vb = getDisplayTitle(b, this.titlePref).toLowerCase();
                     break;
                 default:
                     // scanned_at/posted not available in summary, fall back to folder name
@@ -366,7 +402,7 @@ class App {
         await this.galleryView.load(gallery.id);
 
         this.btnBack.disabled = false;
-        this.updateBreadcrumb(gallery.path, gallery.title_en || gallery.folder_name);
+        this.updateBreadcrumb(gallery.path, getDisplayTitle(gallery, this.titlePref));
     }
 
     /**
@@ -552,8 +588,9 @@ class App {
 
             const title = document.createElement('div');
             title.className = 'dup-title';
-            title.textContent = gallery.title_en || gallery.folder_name;
-            title.title = gallery.title_en || gallery.folder_name;
+            const dupDisplayTitle = getDisplayTitle(gallery, this.titlePref);
+            title.textContent = dupDisplayTitle;
+            title.title = dupDisplayTitle;
 
             const path = document.createElement('div');
             path.className = 'dup-path';
@@ -592,7 +629,7 @@ class App {
             if (b) b.disabled = true;
         }
 
-        const name = gallery.title_en || gallery.folder_name;
+        const name = getDisplayTitle(gallery, this.titlePref);
         const ok = await ask(
             `Path: ${gallery.path}\n\nThis will permanently delete the folder and all its files from disk, remove the DB entry, and clean up the cached thumbnail.`,
             { title: `Delete "${name}"?`, kind: 'warning' }
@@ -663,6 +700,46 @@ class App {
     }
 
     /**
+     * Toggle title preference between EN and JP
+     */
+    async toggleTitlePref() {
+        this.titlePref = this.titlePref === 'en' ? 'jp' : 'en';
+        this.virtualGrid.titlePref = this.titlePref;
+        this.galleryView.titlePref = this.titlePref;
+        this._updateTitleToggleBtn();
+        api.setTitlePref(this.titlePref).catch(() => {});
+
+        // Re-render grid
+        if (this.currentPath && !this.isSearchMode) {
+            this.navigateToFolder(this.currentPath);
+        }
+    }
+
+    _updateTitleToggleBtn() {
+        const btn = document.getElementById('btn-title-toggle');
+        if (btn) {
+            btn.textContent = this.titlePref === 'en' ? 'EN' : 'JP';
+            btn.title = `Showing ${this.titlePref === 'en' ? 'English' : 'Japanese'} titles — click to toggle`;
+        }
+    }
+
+    /**
+     * Batch refresh all currently displayed galleries that have URLs
+     */
+    async batchRefreshCurrentGalleries() {
+        const galleries = this.virtualGrid.items;
+        const ids = galleries.filter(g => g.id > 0).map(g => g.id);
+        if (ids.length === 0) return;
+
+        try {
+            await api.batchRefreshGalleries(ids);
+        } catch (err) {
+            console.error('Batch refresh error:', err);
+            this.scanOverlay.classList.add('hidden');
+        }
+    }
+
+    /**
      * Show settings modal
      */
     async showSettings() {
@@ -671,6 +748,9 @@ class App {
     }
 
     async refreshSettings() {
+        // Update title toggle button
+        this._updateTitleToggleBtn();
+
         // Update cookie status
         try {
             const [cookiePath, cookieExists] = await api.getCookieStatus();

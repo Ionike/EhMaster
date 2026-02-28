@@ -81,6 +81,18 @@ export const api = {
     getCookieStatus() {
         return invoke('get_cookie_status');
     },
+
+    batchRefreshGalleries(ids) {
+        return invoke('batch_refresh_galleries', { ids });
+    },
+
+    setTitlePref(pref) {
+        return invoke('set_title_pref', { pref });
+    },
+
+    getTitlePref() {
+        return invoke('get_title_pref');
+    },
 };
 
 /**
