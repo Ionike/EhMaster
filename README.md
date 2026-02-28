@@ -50,6 +50,10 @@ npm run build
 
 The compiled application will be output to `src-tauri/target/release/`.
 
+### Standalone exe
+
+Download the .exe file from github releases. Is not maintained currently but should be working 
+
 ### First Launch
 
 When you first open EhMaster, you will see an empty interface. Here is how to get started:
