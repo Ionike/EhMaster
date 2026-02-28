@@ -7,10 +7,15 @@ The application indexes your gallery folders from E/Exhentai using metadata form
 BETA: It now accepts galleries from other sources. You will still need a info.txt but an ehentai link is not necessary. The refresh tags function will be disabled.
 
 ## What It Looks Like
+![02](https://github.com/user-attachments/assets/097c89a7-4ecc-4e10-a5fe-61ae6c31ca4a)
+
+<img width="1281" height="748" alt="image1" src="https://github.com/user-attachments/assets/9f8e0feb-749b-4be8-86a8-d3a770bd2460" />
 
 The main window is split into a sidebar for folder navigation and a grid view for browsing galleries. Clicking on a gallery opens a detail view with its full metadata, tags, and pages. To keep it lightweight it will use your windows default image viewer to open.
 
 Fully resizeable
+Features:
+![unnamed](https://github.com/user-attachments/assets/21b9ea8b-ff31-44e6-8864-789119d80658)
 
 
 ## Getting Started
