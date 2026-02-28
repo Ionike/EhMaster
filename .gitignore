@@ -29,4 +29,7 @@ src-tauri/bundle/
 # App data
 *.db
 
+.claude
+/.claude
+
 /cookie/
