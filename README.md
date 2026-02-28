@@ -1,6 +1,7 @@
 # EhMaster
+![icon](https://github.com/user-attachments/assets/1a431575-30dc-4e44-8331-aea2ac3217e5)
 
-EhMaster is a dedicated desktop application for browsing and managing local manga and doujinshi collections. 
+EhMaster is a dedicated desktop web application for browsing and managing local manga and doujinshi collections from E/Exhentai. It has a Webview2 frontend and a high-performance Tauri 2.0 backend, which enables its support of managing and previewing thousands of manga simultaneously.
 
 The application indexes your gallery folders from E/Exhentai using metadata format of info.txt from [E-Hentai Downloader](https://github.com/ccloli/E-Hentai-Downloader) . It provide a searchbar, thumbnails view and tag-based navigation. If you have an ExHentai account, it can also refresh metadata directly from the site.
 
