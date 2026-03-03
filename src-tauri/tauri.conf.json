@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicoulaj/tauri/dev/crates/tauri-config-schema/schema.json",
-  "productName": "Manga Viewer",
-  "version": "0.1.0",
-  "identifier": "com.manga-viewer.app",
+  "productName": "EhMaster",
+  "version": "1.0.1",
+  "identifier": "com.eh-master.app",
   "build": {
     "frontendDist": "../frontend"
   },
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Manga Viewer",
+        "title": "EhMaster",
         "width": 1400,
         "height": 900,
         "minWidth": 900,

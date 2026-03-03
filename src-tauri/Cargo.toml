@@ -1,14 +1,14 @@
 [package]
-name = "manga-viewer"
-version = "0.1.0"
+name = "eh-master"
+version = "1.0.1"
 edition = "2021"
 
 [lib]
-name = "manga_viewer_lib"
+name = "eh_master_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [[bin]]
-name = "manga-viewer"
+name = "eh-master"
 path = "src/main.rs"
 
 [dependencies]
