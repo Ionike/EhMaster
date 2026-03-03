@@ -197,10 +197,63 @@ pub async fn get_gallery_pages(
 pub async fn open_file(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", &path])
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        // Use the WinRT Launcher API with NeighboringFilesQuery so UWP image
+        // viewers (like Pictureflect) receive the full folder of images for
+        // back/forward navigation.
+        use windows::core::HSTRING;
+        use windows::Storage::{StorageFile, StorageFolder};
+        use windows::Storage::Search::QueryOptions;
+        use windows::System::{Launcher, LauncherOptions};
+
+        let file_path = std::path::Path::new(&path);
+        let folder_path = file_path
+            .parent()
+            .ok_or("No parent folder")?
+            .to_string_lossy()
+            .to_string();
+
+        // Open the StorageFile and its parent StorageFolder
+        let file = StorageFile::GetFileFromPathAsync(&HSTRING::from(&path))
+            .map_err(|e| format!("GetFileFromPathAsync: {}", e))?
+            .get()
+            .map_err(|e| format!("GetFileFromPathAsync.get: {}", e))?;
+
+        let folder = StorageFolder::GetFolderFromPathAsync(&HSTRING::from(&folder_path))
+            .map_err(|e| format!("GetFolderFromPathAsync: {}", e))?
+            .get()
+            .map_err(|e| format!("GetFolderFromPathAsync.get: {}", e))?;
+
+        // Create a query for image files in the folder — this provides
+        // the neighboring files context to the image viewer
+        let query_options = QueryOptions::new()
+            .map_err(|e| format!("QueryOptions::new: {}", e))?;
+        let file_types = query_options.FileTypeFilter()
+            .map_err(|e| format!("FileTypeFilter: {}", e))?;
+        for ext in &[".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif"] {
+            file_types.Append(&HSTRING::from(*ext))
+                .map_err(|e| format!("Append file type: {}", e))?;
+        }
+
+        let query_result = folder
+            .CreateFileQueryWithOptions(&query_options)
+            .map_err(|e| format!("CreateFileQueryWithOptions: {}", e))?;
+
+        // Set up launcher options with the neighboring files query
+        let options = LauncherOptions::new()
+            .map_err(|e| format!("LauncherOptions::new: {}", e))?;
+        options
+            .SetNeighboringFilesQuery(&query_result)
+            .map_err(|e| format!("SetNeighboringFilesQuery: {}", e))?;
+
+        // Launch the file with the default handler + neighboring files
+        let success = Launcher::LaunchFileWithOptionsAsync(&file, &options)
+            .map_err(|e| format!("LaunchFileWithOptionsAsync: {}", e))?
+            .get()
+            .map_err(|e| format!("LaunchFileWithOptionsAsync.get: {}", e))?;
+
+        if !success {
+            return Err("Launcher failed to open file".to_string());
+        }
     }
     #[cfg(target_os = "macos")]
     {
