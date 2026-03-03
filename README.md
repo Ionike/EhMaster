@@ -12,10 +12,15 @@ BETA: It now accepts galleries from other sources. You will still need a info.tx
 
 <img width="1281" height="748" alt="image1" src="https://github.com/user-attachments/assets/9f8e0feb-749b-4be8-86a8-d3a770bd2460" />
 
-The main window is split into a sidebar for folder navigation and a grid view for browsing galleries. Clicking on a gallery opens a detail view with its full metadata, tags, and pages. To keep it lightweight it will use your windows default image viewer to open.
+The main window is split into a sidebar for folder navigation and a grid view for browsing galleries. Left Click on a gallery opens a detail view with its full metadata, tags, and pages. To keep it lightweight it will use your windows default image viewer. Right Click opens a context menu.
 
-Fully resizeable
-Features:
+Select button is also provided to operate on multiple galleries. 
+
+Galleries are resizeble in settings.
+
+A splitter is provided to dynamically adjust the panel size.
+
+Features(old image):
 ![unnamed](https://github.com/user-attachments/assets/21b9ea8b-ff31-44e6-8864-789119d80658)
 
 
@@ -53,7 +58,7 @@ The compiled application will be output to `src-tauri/target/release/`.
 
 ### Standalone exe
 
-Download the .exe file from github releases. Is not maintained currently but should be working 
+Download the .exe file from github releases. Might not be the newest version.
 
 ### First Launch
 
