@@ -6,9 +6,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
 
-use manga_viewer_lib::commands;
-use manga_viewer_lib::db::Database;
-use manga_viewer_lib::state::AppState;
+use eh_master_lib::commands;
+use eh_master_lib::db::Database;
+use eh_master_lib::state::AppState;
 
 fn main() {
     tauri::Builder::default()
@@ -52,7 +52,7 @@ fn main() {
                     let root = PathBuf::from(path);
                     if root.exists() {
                         let db = Arc::clone(&state.db);
-                        let handle = manga_viewer_lib::watcher::start_watcher(
+                        let handle = eh_master_lib::watcher::start_watcher(
                             root,
                             db,
                             cache_dir.clone(),
