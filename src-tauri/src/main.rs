@@ -101,6 +101,8 @@ fn main() {
             commands::batch_refresh_galleries,
             commands::set_title_pref,
             commands::get_title_pref,
+            commands::set_grid_card_width,
+            commands::get_grid_card_width,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

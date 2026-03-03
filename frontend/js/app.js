@@ -97,6 +97,18 @@ class App {
         this.galleryView.titlePref = this.titlePref;
         this._updateTitleToggleBtn();
 
+        // Load grid card size
+        try {
+            const w = await api.getGridCardWidth();
+            if (w >= 150 && w <= 400) {
+                this.virtualGrid.setCardSize(w);
+                const slider = document.getElementById('grid-size-slider');
+                const label = document.getElementById('grid-size-value');
+                if (slider) slider.value = w;
+                if (label) label.textContent = `${w}px`;
+            }
+        } catch (_) {}
+
         const paths = await api.getRootPaths();
         if (paths.length > 0) {
             this.welcomeScreen.classList.add('hidden');
@@ -299,6 +311,21 @@ class App {
             this.toggleTitlePref();
         });
 
+        // Grid size slider
+        const gridSlider = document.getElementById('grid-size-slider');
+        const gridSizeLabel = document.getElementById('grid-size-value');
+        if (gridSlider) {
+            gridSlider.addEventListener('input', () => {
+                const w = parseInt(gridSlider.value, 10);
+                gridSizeLabel.textContent = `${w}px`;
+                this.virtualGrid.setCardSize(w);
+            });
+            gridSlider.addEventListener('change', () => {
+                const w = parseInt(gridSlider.value, 10);
+                api.setGridCardWidth(w).catch(() => {});
+            });
+        }
+
         // Batch refresh button
         document.getElementById('btn-refresh-all')?.addEventListener('click', () => {
             this.settingsModal.classList.add('hidden');
@@ -329,6 +356,9 @@ class App {
                 }
             }
         });
+
+        // Sidebar splitter drag
+        this._setupSplitter();
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -416,6 +446,66 @@ class App {
         onEvent('watcher-update', (data) => {
             this._refreshCurrentView();
         });
+    }
+
+    _setupSplitter() {
+        const splitter = document.getElementById('sidebar-splitter');
+        const sidebar = document.getElementById('sidebar');
+        let startX, startWidth;
+
+        const onDragMove = (clientX) => {
+            const delta = clientX - startX;
+            const newWidth = Math.min(500, Math.max(150, startWidth + delta));
+            sidebar.style.width = `${newWidth}px`;
+        };
+
+        const onDragEnd = () => {
+            splitter.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onDragEnd);
+            document.removeEventListener('touchmove', onTouchMove);
+            document.removeEventListener('touchend', onDragEnd);
+            localStorage.setItem('sidebarWidth', sidebar.style.width);
+        };
+
+        const onMouseMove = (e) => onDragMove(e.clientX);
+        const onTouchMove = (e) => {
+            e.preventDefault();
+            onDragMove(e.touches[0].clientX);
+        };
+
+        const startDrag = (clientX) => {
+            startX = clientX;
+            startWidth = sidebar.getBoundingClientRect().width;
+            splitter.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        };
+
+        splitter.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startDrag(e.clientX);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onDragEnd);
+        });
+
+        splitter.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startDrag(e.touches[0].clientX);
+            document.addEventListener('touchmove', onTouchMove, { passive: false });
+            document.addEventListener('touchend', onDragEnd);
+        }, { passive: false });
+
+        // Restore saved width (validate before applying)
+        const saved = localStorage.getItem('sidebarWidth');
+        if (saved) {
+            const px = parseInt(saved, 10);
+            if (px >= 150 && px <= 500) {
+                sidebar.style.width = `${px}px`;
+            }
+        }
     }
 
     /**
@@ -538,9 +628,15 @@ class App {
     }
 
     /**
-     * Go back in navigation history
+     * Go back in navigation history.
+     * Responds immediately even if a large folder is still loading.
      */
-    async goBack() {
+    goBack() {
+        if (this._goingBack) return; // prevent rapid repeated clicks
+        this._goingBack = true;
+
+        const finish = () => { this._goingBack = false; };
+
         if (!this.galleryViewEl.classList.contains('hidden')) {
             this.galleryView.hide();
             this.galleryGridEl.classList.remove('hidden');
@@ -550,11 +646,13 @@ class App {
                 // If data changed while we were in gallery view, re-fetch
                 if (this._pendingRefresh) {
                     this._pendingRefresh = false;
-                    this.navigateToFolder(prevPath);
+                    this.navigateToFolder(prevPath).finally(finish);
                 } else {
                     this.updateBreadcrumb(prevPath);
-                    await this.folderTree.setActive(prevPath);
+                    this.folderTree.setActive(prevPath).finally(finish);
                 }
+            } else {
+                finish();
             }
             this.btnBack.disabled = this.navigationHistory.length === 0;
             return;
@@ -563,7 +661,9 @@ class App {
         if (this.navigationHistory.length > 0) {
             const prevPath = this.navigationHistory.pop();
             this.currentPath = prevPath;
-            this.navigateToFolder(prevPath);
+            this.navigateToFolder(prevPath).finally(finish);
+        } else {
+            finish();
         }
     }
 
@@ -883,6 +983,18 @@ class App {
     async refreshSettings() {
         // Update title toggle button
         this._updateTitleToggleBtn();
+
+        // Update grid size slider and sync grid
+        try {
+            const w = await api.getGridCardWidth();
+            const slider = document.getElementById('grid-size-slider');
+            const label = document.getElementById('grid-size-value');
+            if (slider) slider.value = w;
+            if (label) label.textContent = `${w}px`;
+            if (w >= 150 && w <= 400) {
+                this.virtualGrid.setCardSize(w);
+            }
+        } catch (_) {}
 
         // Update cookie status
         try {

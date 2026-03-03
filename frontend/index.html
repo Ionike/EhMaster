@@ -36,6 +36,9 @@
                 <div id="folder-tree"></div>
             </aside>
 
+            <!-- Draggable splitter between sidebar and content -->
+            <div id="sidebar-splitter"></div>
+
             <!-- Content Area -->
             <main id="content">
                 <!-- Welcome / empty state -->
@@ -100,6 +103,11 @@
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
                         <span style="font-size: 13px; color: var(--text-secondary);">Title Language</span>
                         <button id="btn-title-toggle" class="primary-btn" style="min-width: 50px;">EN</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <span style="font-size: 13px; color: var(--text-secondary);">Grid Card Size</span>
+                        <input type="range" id="grid-size-slider" min="150" max="400" step="10" value="200" style="flex: 1; cursor: pointer;">
+                        <span id="grid-size-value" style="font-size: 13px; color: var(--text-secondary); min-width: 40px;">200px</span>
                     </div>
 
                     <h4 style="margin-top: 20px;">Actions</h4>

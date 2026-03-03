@@ -94,7 +94,6 @@
 /* Gallery card */
 .gallery-card {
     position: absolute;
-    width: 200px;
     cursor: pointer;
     transition: box-shadow 0.15s, border-color 0.15s;
     border-radius: 6px;
@@ -111,7 +110,7 @@
 
 .card-thumb {
     width: 100%;
-    height: 280px;
+    aspect-ratio: 5 / 7;
     overflow: hidden;
     background: var(--bg-input);
     display: flex;
@@ -127,6 +126,10 @@
 }
 
 /* Wide gallery cards (horizontal thumbnails spanning 2 columns) */
+.gallery-card-wide .card-thumb {
+    aspect-ratio: 10 / 7;
+}
+
 .gallery-card-wide .card-thumb img {
     object-fit: cover;
 }

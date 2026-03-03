@@ -101,6 +101,14 @@ export const api = {
     getTitlePref() {
         return invoke('get_title_pref');
     },
+
+    setGridCardWidth(width) {
+        return invoke('set_grid_card_width', { width });
+    },
+
+    getGridCardWidth() {
+        return invoke('get_grid_card_width');
+    },
 };
 
 /**

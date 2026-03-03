@@ -48,7 +48,23 @@ export class VirtualGrid {
         this._resizeTicking = false;
 
         this.container.addEventListener('scroll', this._scrollHandler);
-        window.addEventListener('resize', this._resizeHandler);
+
+        // Use ResizeObserver instead of window resize so splitter drags
+        // and any other container-width changes trigger re-layout.
+        this._resizeObserver = new ResizeObserver(this._resizeHandler);
+        this._resizeObserver.observe(this.container);
+    }
+
+    /**
+     * Update the card size and re-layout
+     */
+    setCardSize(cardWidth) {
+        this.cardWidth = cardWidth + this.gap;
+        // thumb aspect-ratio is 5/7, card-info ~50px, border ~4px, gap 16px
+        this.cardHeight = Math.round(cardWidth * 1.4) + 70;
+        this.pool.forEach(node => node.remove());
+        this.pool.clear();
+        this._layout();
     }
 
     /**
@@ -476,7 +492,7 @@ export class VirtualGrid {
 
     destroy() {
         this.container.removeEventListener('scroll', this._scrollHandler);
-        window.removeEventListener('resize', this._resizeHandler);
+        if (this._resizeObserver) this._resizeObserver.disconnect();
         this.pool.forEach(node => node.remove());
         this.pool.clear();
     }

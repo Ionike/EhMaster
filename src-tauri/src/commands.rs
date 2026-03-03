@@ -803,6 +803,26 @@ pub async fn get_title_pref(state: State<'_, AppState>) -> Result<String, String
     Ok(settings.title_pref.clone())
 }
 
+#[tauri::command]
+pub async fn set_grid_card_width(
+    width: u32,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    {
+        let mut settings = state.settings.lock().unwrap();
+        settings.grid_card_width = width.clamp(150, 400);
+    }
+    save_settings(&state, &app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_grid_card_width(state: State<'_, AppState>) -> Result<u32, String> {
+    let settings = state.settings.lock().unwrap();
+    Ok(settings.grid_card_width)
+}
+
 fn urlencoding(s: &str) -> String {
     let mut encoded = String::new();
     for ch in s.chars() {

@@ -106,10 +106,16 @@ pub struct AppSettings {
     pub cookie_path: String,
     #[serde(default = "default_title_pref")]
     pub title_pref: String,
+    #[serde(default = "default_grid_card_width")]
+    pub grid_card_width: u32,
 }
 
 fn default_title_pref() -> String {
     "en".to_string()
+}
+
+fn default_grid_card_width() -> u32 {
+    200
 }
 
 impl Default for AppSettings {
@@ -120,6 +126,7 @@ impl Default for AppSettings {
             watcher_enabled: true,
             cookie_path: String::new(),
             title_pref: "en".to_string(),
+            grid_card_width: 200,
         }
     }
 }
