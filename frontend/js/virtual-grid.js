@@ -6,6 +6,8 @@ import { getCategoryClass, formatRating, getDisplayTitle } from './utils.js';
  * Only renders items visible in the viewport + a buffer for smooth scrolling.
  * Galleries with horizontal thumbnails (width > height) span 2 columns.
  * Wideness is detected on the frontend when images load, triggering re-layout.
+ *
+ * Supports multi-selection (Ctrl+Click) and right-click context menu on gallery cards.
  */
 export class VirtualGrid {
     constructor(container, sentinel, options = {}) {
@@ -33,6 +35,12 @@ export class VirtualGrid {
         this.titlePref = options.titlePref || 'en';
         this.onGalleryClick = options.onGalleryClick || (() => {});
         this.onFolderClick = options.onFolderClick || (() => {});
+        this.onGalleryContext = options.onGalleryContext || null;
+
+        // Selection state
+        this.selectedGalleries = new Set(); // set of gallery paths
+        this.selectMode = false; // toggle-based selection mode
+        this.onSelectionChange = options.onSelectionChange || (() => {});
 
         this._scrollHandler = this._onScroll.bind(this);
         this._resizeHandler = this._onResize.bind(this);
@@ -53,6 +61,7 @@ export class VirtualGrid {
         this.pool.forEach(node => node.remove());
         this.pool.clear();
         this.container.scrollTop = 0;
+        this.clearSelection();
         this._layout();
     }
 
@@ -61,6 +70,58 @@ export class VirtualGrid {
      */
     get totalItems() {
         return this.folders.length + this.items.length;
+    }
+
+    // --- Selection ---
+
+    clearSelection() {
+        this.selectedGalleries.clear();
+        this._updateSelectionVisuals();
+        this.onSelectionChange(this.selectedGalleries);
+    }
+
+    selectAll() {
+        for (const g of this.items) {
+            if (g.path) this.selectedGalleries.add(g.path);
+        }
+        this._updateSelectionVisuals();
+        this.onSelectionChange(this.selectedGalleries);
+    }
+
+    _toggleSelection(gallery) {
+        const path = gallery.path;
+        if (this.selectedGalleries.has(path)) {
+            this.selectedGalleries.delete(path);
+        } else {
+            this.selectedGalleries.add(path);
+        }
+        this._updateSelectionVisuals();
+        this.onSelectionChange(this.selectedGalleries);
+    }
+
+    _updateSelectionVisuals() {
+        for (const [key, node] of this.pool) {
+            if (key.startsWith('f_')) continue;
+            const idx = parseInt(key);
+            const gallery = this.items[idx];
+            if (gallery && this.selectedGalleries.has(gallery.path)) {
+                node.classList.add('selected');
+            } else {
+                node.classList.remove('selected');
+            }
+        }
+    }
+
+    setSelectMode(enabled) {
+        this.selectMode = enabled;
+        if (!enabled) {
+            this.clearSelection();
+        }
+    }
+
+    /** Get the gallery objects that are currently selected */
+    getSelectedGalleries() {
+        return this.items.filter(g => this.selectedGalleries.has(g.path));
     }
 
     /**
@@ -265,6 +326,7 @@ export class VirtualGrid {
 
         const card = document.createElement('div');
         card.className = pos.colSpan > 1 ? 'gallery-card gallery-card-wide' : 'gallery-card';
+        if (this.selectedGalleries.has(gallery.path)) card.classList.add('selected');
         card.style.left = `${x}px`;
         card.style.top = `${y}px`;
         card.style.width = `${cardW}px`;
@@ -334,9 +396,37 @@ export class VirtualGrid {
         card.appendChild(thumb);
         card.appendChild(info);
 
-        card.addEventListener('click', () => {
-            this.onGalleryClick(gallery);
+        // Click: select mode or Ctrl+Click toggles selection, plain click opens gallery
+        card.addEventListener('click', (e) => {
+            if (this.selectMode || e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                this._toggleSelection(gallery);
+            } else if (this.selectedGalleries.size > 0) {
+                this.clearSelection();
+            } else {
+                this.onGalleryClick(gallery);
+            }
         });
+
+        // Right-click / long-press context menu
+        if (this.onGalleryContext) {
+            card.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (this.selectMode) {
+                    // In select mode: ensure this gallery is selected, show menu for all
+                    if (!this.selectedGalleries.has(gallery.path)) {
+                        this.selectedGalleries.add(gallery.path);
+                        this._updateSelectionVisuals();
+                        this.onSelectionChange(this.selectedGalleries);
+                    }
+                    this.onGalleryContext(e, gallery, this.getSelectedGalleries());
+                } else {
+                    // Not in select mode: show menu for just this gallery
+                    this.onGalleryContext(e, gallery, [gallery]);
+                }
+            });
+        }
 
         return card;
     }
@@ -353,6 +443,8 @@ export class VirtualGrid {
         card.style.top = `${y}px`;
         card.style.width = `${this.cardWidth - this.gap}px`;
 
+        card.addEventListener('click', () => this.onFolderClick(folder));
+
         const icon = document.createElement('div');
         icon.className = 'folder-icon';
         icon.textContent = '\uD83D\uDCC1';
@@ -364,10 +456,6 @@ export class VirtualGrid {
 
         card.appendChild(icon);
         card.appendChild(name);
-
-        card.addEventListener('click', () => {
-            this.onFolderClick(folder);
-        });
 
         return card;
     }

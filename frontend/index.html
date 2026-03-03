@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="css/sidebar.css">
     <link rel="stylesheet" href="css/virtual-grid.css">
     <link rel="stylesheet" href="css/gallery-view.css">
+    <link rel="stylesheet" href="css/context-menu.css">
 </head>
 <body>
     <div id="app">
@@ -48,14 +49,18 @@
                 <div id="gallery-grid" class="hidden">
                     <div id="grid-info-bar">
                         <span id="grid-count"></span>
-                        <select id="sort-select">
-                            <option value="scanned_at:desc">Recently Added</option>
-                            <option value="title:asc">Title A-Z</option>
-                            <option value="title:desc">Title Z-A</option>
-                            <option value="rating:desc">Rating</option>
-                            <option value="posted:desc">Date Posted</option>
-                            <option value="pages:desc">Most Pages</option>
-                        </select>
+                        <div class="grid-actions">
+                            <button id="btn-move-selected" class="topbar-btn hidden" title="Move selected to...">Move</button>
+                            <button id="btn-select-mode" class="topbar-btn" title="Toggle selection mode">&#9745;</button>
+                            <select id="sort-select">
+                                <option value="scanned_at:desc">Recently Added</option>
+                                <option value="title:asc">Title A-Z</option>
+                                <option value="title:desc">Title Z-A</option>
+                                <option value="rating:desc">Rating</option>
+                                <option value="posted:desc">Date Posted</option>
+                                <option value="pages:desc">Most Pages</option>
+                            </select>
+                        </div>
                     </div>
                     <div id="grid-container">
                         <div id="grid-sentinel"></div>

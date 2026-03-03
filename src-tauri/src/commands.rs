@@ -452,6 +452,89 @@ pub async fn delete_gallery(
 }
 
 #[tauri::command]
+pub async fn move_folders(
+    sources: Vec<String>,
+    destination: String,
+    state: State<'_, AppState>,
+) -> Result<u64, String> {
+    let dest = PathBuf::from(&destination);
+    if !dest.is_dir() {
+        return Err(format!("Destination is not a directory: {}", destination));
+    }
+
+    let mut moved = 0u64;
+    for source in &sources {
+        let src = PathBuf::from(source);
+        if !src.exists() {
+            continue;
+        }
+        let folder_name = src
+            .file_name()
+            .ok_or_else(|| format!("Invalid source path: {}", source))?;
+        let target = dest.join(folder_name);
+
+        if target.exists() {
+            return Err(format!(
+                "Destination already contains a folder named '{}'",
+                folder_name.to_string_lossy()
+            ));
+        }
+
+        // Move on disk
+        fs::rename(&src, &target).map_err(|e| {
+            format!("Failed to move '{}': {}", source, e)
+        })?;
+
+        // Update DB paths
+        let old_prefix = normalize_path(&src);
+        let new_prefix = normalize_path(&target);
+        state
+            .db
+            .move_gallery_paths(&old_prefix, &new_prefix)
+            .map_err(|e| e.to_string())?;
+
+        moved += 1;
+    }
+
+    Ok(moved)
+}
+
+#[tauri::command]
+pub async fn delete_gallery_folder(
+    path: String,
+    state: State<'_, AppState>,
+) -> Result<u64, String> {
+    let folder = PathBuf::from(&path);
+
+    // Delete galleries from DB and collect thumbnails to clean up
+    let deleted = state
+        .db
+        .delete_galleries_under_path(&path)
+        .map_err(|e| e.to_string())?;
+
+    let count = deleted.len() as u64;
+
+    // Clean up thumbnails
+    for (_, thumb) in &deleted {
+        if !thumb.is_empty() {
+            let p = Path::new(thumb);
+            if p.exists() {
+                let _ = fs::remove_file(p);
+            }
+        }
+    }
+
+    // Delete the folder from disk
+    if folder.is_dir() {
+        fs::remove_dir_all(&folder).map_err(|e| {
+            format!("DB entries removed but failed to delete folder: {}", e)
+        })?;
+    }
+
+    Ok(count)
+}
+
+#[tauri::command]
 pub async fn clear_cache(_state: State<'_, AppState>) -> Result<CacheCleanResult, String> {
     Ok(CacheCleanResult { removed: 0, freed_bytes: 0 })
 }

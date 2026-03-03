@@ -4,6 +4,7 @@ import { FolderTree } from './folder-tree.js';
 import { VirtualGrid } from './virtual-grid.js';
 import { GalleryView } from './gallery-view.js';
 import { SearchController } from './search.js';
+import { ContextMenu } from './context-menu.js';
 import { getDisplayTitle } from './utils.js';
 
 /**
@@ -12,6 +13,8 @@ import { getDisplayTitle } from './utils.js';
 class App {
     constructor() {
         // DOM references
+        this.btnSelectMode = document.getElementById('btn-select-mode');
+        this.btnMoveSelected = document.getElementById('btn-move-selected');
         this.welcomeScreen = document.getElementById('welcome-screen');
         this.galleryGridEl = document.getElementById('gallery-grid');
         this.galleryViewEl = document.getElementById('gallery-view');
@@ -38,6 +41,10 @@ class App {
         this._navId = 0;
         this._scanQueue = [];
         this.titlePref = 'en';
+        this._lastGridCount = '';
+
+        // Context menu
+        this.contextMenu = new ContextMenu();
 
         // Initialize components
         this.folderTree = new FolderTree(
@@ -51,6 +58,8 @@ class App {
             {
                 onGalleryClick: (gallery) => this.openGallery(gallery),
                 onFolderClick: (folder) => this.navigateToFolder(folder.path),
+                onGalleryContext: (e, gallery, selected) => this._showGalleryContextMenu(e, gallery, selected),
+                onSelectionChange: (sel) => this._onSelectionChange(sel),
             }
         );
 
@@ -95,6 +104,99 @@ class App {
             await this.folderTree.loadRoots();
             // Navigate to first root
             this.navigateToFolder(paths[0]);
+        }
+    }
+
+    // --- Selection & Context Menu ---
+
+    _onSelectionChange(sel) {
+        if (sel.size > 0) {
+            this.gridCount.textContent = `${sel.size} selected`;
+            this.btnMoveSelected.classList.remove('hidden');
+        } else {
+            this.gridCount.textContent = this._lastGridCount;
+            this.btnMoveSelected.classList.add('hidden');
+        }
+    }
+
+    toggleSelectMode() {
+        const active = !this.virtualGrid.selectMode;
+        this.virtualGrid.setSelectMode(active);
+        this.btnSelectMode.classList.toggle('active', active);
+        if (!active) this.btnMoveSelected.classList.add('hidden');
+    }
+
+    _showGalleryContextMenu(e, gallery, selectedGalleries) {
+        const items = [];
+        const count = selectedGalleries.length;
+        const isMulti = count > 1;
+
+        // Open in Explorer (single only)
+        if (!isMulti && gallery.path) {
+            items.push({
+                label: 'Open in Explorer',
+                action: () => api.openFile(gallery.path),
+            });
+        }
+
+        // Move to...
+        items.push({
+            label: isMulti ? `Move ${count} to...` : 'Move to...',
+            action: () => this._moveGalleries(selectedGalleries),
+        });
+
+        items.push({ separator: true });
+
+        // Delete
+        items.push({
+            label: isMulti ? `Delete ${count} galleries` : 'Delete',
+            danger: true,
+            action: () => this._deleteGalleriesFromContext(selectedGalleries),
+        });
+
+        this.contextMenu.show(e.clientX, e.clientY, items);
+    }
+
+    async _moveGalleries(galleries) {
+        const folder = await api.pickFolder();
+        if (!folder) return;
+
+        const paths = galleries.map(g => g.path).filter(Boolean);
+        if (paths.length === 0) return;
+
+        try {
+            await api.moveFolders(paths, folder);
+            this.virtualGrid.clearSelection();
+            this._refreshCurrentView();
+        } catch (err) {
+            alert(`Move failed: ${err}`);
+        }
+    }
+
+    async _deleteGalleriesFromContext(galleries) {
+        const count = galleries.length;
+        const label = count === 1
+            ? `"${getDisplayTitle(galleries[0], this.titlePref)}"`
+            : `${count} galleries`;
+
+        const ok = await ask(
+            `This will permanently delete ${label} and all files from disk.`,
+            { title: `Delete ${label}?`, kind: 'warning' }
+        );
+        if (!ok) return;
+
+        try {
+            for (const g of galleries) {
+                if (g.id && g.id > 0) {
+                    await api.deleteGallery(g.id);
+                } else if (g.path) {
+                    await api.deleteGalleryFolder(g.path);
+                }
+            }
+            this.virtualGrid.clearSelection();
+            this._refreshCurrentView();
+        } catch (err) {
+            alert(`Delete failed: ${err}`);
         }
     }
 
@@ -203,6 +305,15 @@ class App {
             this.batchRefreshCurrentGalleries();
         });
 
+        // Select mode toggle
+        this.btnSelectMode.addEventListener('click', () => this.toggleSelectMode());
+
+        // Move selected galleries
+        this.btnMoveSelected.addEventListener('click', () => {
+            const selected = this.virtualGrid.getSelectedGalleries();
+            if (selected.length > 0) this._moveGalleries(selected);
+        });
+
         // Back button
         this.btnBack.addEventListener('click', () => this.goBack());
 
@@ -222,6 +333,16 @@ class App {
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                // First: hide context menu
+                this.contextMenu.hide();
+
+                // Exit select mode and clear selection if any
+                if (this.virtualGrid.selectMode || this.virtualGrid.selectedGalleries.size > 0) {
+                    this.virtualGrid.setSelectMode(false);
+                    this.btnSelectMode.classList.remove('active');
+                    return;
+                }
+
                 if (!this.galleryViewEl.classList.contains('hidden')) {
                     this.goBack();
                 } else if (!this.duplicatesModal.classList.contains('hidden')) {
@@ -234,6 +355,16 @@ class App {
             if (e.ctrlKey && e.key === 'f') {
                 e.preventDefault();
                 document.getElementById('search-input').focus();
+            }
+            // Ctrl+A to select all galleries
+            if (e.ctrlKey && e.key === 'a') {
+                // Only if grid is visible and not in gallery view
+                if (!this.galleryGridEl.classList.contains('hidden') &&
+                    this.galleryViewEl.classList.contains('hidden') &&
+                    document.activeElement?.tagName !== 'INPUT') {
+                    e.preventDefault();
+                    this.virtualGrid.selectAll();
+                }
             }
         });
     }
@@ -354,8 +485,8 @@ class App {
         this.currentPath = path;
         this.btnBack.disabled = this.navigationHistory.length === 0;
 
-        // Update folder tree selection
-        this.folderTree.setActive(path);
+        // Update folder tree selection (expands ancestors if needed)
+        await this.folderTree.setActive(path);
 
         // Hide gallery view, show grid
         this.galleryView.hide();
@@ -371,7 +502,8 @@ class App {
             const result = await api.getFolderChildren(path);
             if (navId !== this._navId) return;
             this._sortGalleries(result.galleries);
-            this.gridCount.textContent = `${result.galleries.length} galleries, ${result.subfolders.length} folders`;
+            this._lastGridCount = `${result.galleries.length} galleries, ${result.subfolders.length} folders`;
+            this.gridCount.textContent = this._lastGridCount;
             this.virtualGrid.setItems(result.galleries, result.subfolders);
         } catch (err) {
             if (navId !== this._navId) return;
@@ -408,7 +540,7 @@ class App {
     /**
      * Go back in navigation history
      */
-    goBack() {
+    async goBack() {
         if (!this.galleryViewEl.classList.contains('hidden')) {
             this.galleryView.hide();
             this.galleryGridEl.classList.remove('hidden');
@@ -421,7 +553,7 @@ class App {
                     this.navigateToFolder(prevPath);
                 } else {
                     this.updateBreadcrumb(prevPath);
-                    this.folderTree.setActive(prevPath);
+                    await this.folderTree.setActive(prevPath);
                 }
             }
             this.btnBack.disabled = this.navigationHistory.length === 0;
@@ -444,7 +576,8 @@ class App {
         this.galleryGridEl.classList.remove('hidden');
         this.welcomeScreen.classList.add('hidden');
 
-        this.gridCount.textContent = `${result.total_count} results`;
+        this._lastGridCount = `${result.total_count} results`;
+        this.gridCount.textContent = this._lastGridCount;
         this.virtualGrid.setItems(result.galleries, []);
 
         this.breadcrumb.innerHTML = '<span class="crumb">Search Results</span>';

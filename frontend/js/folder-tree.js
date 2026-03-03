@@ -1,7 +1,7 @@
 import { api } from './api.js';
 
 /**
- * Sidebar folder tree component
+ * Sidebar folder tree component.
  */
 export class FolderTree {
     constructor(container, onFolderSelect) {
@@ -107,7 +107,7 @@ export class FolderTree {
             }
 
             // Select this folder
-            this.setActive(np);
+            await this.setActive(np);
             this.onFolderSelect(np);
         });
 
@@ -142,17 +142,73 @@ export class FolderTree {
     }
 
     /**
-     * Set the active (selected) folder
+     * Set the active (selected) folder, expanding ancestors if needed.
      */
-    setActive(path) {
+    async setActive(path) {
         this.activePath = path.replace(/\\/g, '/');
         // Update visual state
         this.container.querySelectorAll('.tree-label.active').forEach(el => {
             el.classList.remove('active');
         });
-        const node = this.container.querySelector(`[data-path="${CSS.escape(this.activePath)}"] > .tree-label`);
+        let node = this.container.querySelector(`[data-path="${CSS.escape(this.activePath)}"] > .tree-label`);
+        if (!node) {
+            // Node not in DOM yet — expand ancestor chain to reveal it
+            await this._revealPath(this.activePath);
+            node = this.container.querySelector(`[data-path="${CSS.escape(this.activePath)}"] > .tree-label`);
+        }
         if (node) {
             node.classList.add('active');
+            node.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    /**
+     * Expand the tree along the ancestor chain so that `targetPath` becomes visible.
+     */
+    async _revealPath(targetPath) {
+        // Find which root this path belongs to
+        const roots = Array.from(this.container.querySelectorAll(':scope > .tree-node'));
+        let matchRoot = null;
+        for (const root of roots) {
+            const rp = root.dataset.path;
+            if (targetPath === rp || targetPath.startsWith(rp + '/')) {
+                matchRoot = root;
+                break;
+            }
+        }
+        if (!matchRoot) return;
+
+        const rootPath = matchRoot.dataset.path;
+        if (targetPath === rootPath) return; // already at root
+
+        // Build list of ancestor paths from root down to target
+        const suffix = targetPath.slice(rootPath.length + 1); // after the '/'
+        const parts = suffix.split('/');
+        let current = rootPath;
+        const chain = [rootPath];
+        for (const part of parts) {
+            current += '/' + part;
+            chain.push(current);
+        }
+
+        // Expand each ancestor (skip the target itself)
+        for (let i = 0; i < chain.length - 1; i++) {
+            const p = chain[i];
+            const nodeEl = this.container.querySelector(`[data-path="${CSS.escape(p)}"]`);
+            if (!nodeEl) break;
+
+            const childrenEl = nodeEl.querySelector(':scope > .tree-children');
+            const toggleEl = nodeEl.querySelector(':scope > .tree-label .tree-toggle');
+
+            if (!this.expandedPaths.has(p)) {
+                this.expandedPaths.add(p);
+                if (toggleEl) toggleEl.classList.add('expanded');
+                if (childrenEl) childrenEl.classList.remove('collapsed');
+            }
+            // Load children if not yet loaded
+            if (childrenEl && childrenEl.children.length === 0) {
+                await this.loadChildren(p, childrenEl);
+            }
         }
     }
 

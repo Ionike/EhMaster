@@ -62,6 +62,14 @@ export const api = {
         return invoke('delete_gallery', { id });
     },
 
+    moveFolders(sources, destination) {
+        return invoke('move_folders', { sources, destination });
+    },
+
+    deleteGalleryFolder(path) {
+        return invoke('delete_gallery_folder', { path });
+    },
+
     clearCache() {
         return invoke('clear_cache');
     },

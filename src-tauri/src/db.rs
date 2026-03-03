@@ -523,6 +523,80 @@ impl Database {
         Ok(results)
     }
 
+    /// Move all galleries whose path starts with `old_prefix` to `new_prefix`.
+    /// Updates path, parent_path, folder_name, and FTS index.
+    pub fn move_gallery_paths(&self, old_prefix: &str, new_prefix: &str) -> SqlResult<u64> {
+        let conn = self.conn.lock().unwrap();
+
+        // Find affected galleries
+        let mut stmt = conn.prepare(
+            "SELECT id, path FROM galleries WHERE path = ?1 OR path LIKE ?2",
+        )?;
+        let pattern = format!("{}/%", old_prefix.replace('\\', "/"));
+        let old_norm = old_prefix.replace('\\', "/");
+        let rows: Vec<(i64, String)> = stmt
+            .query_map(params![old_norm, pattern], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut count = 0u64;
+        for (id, old_path) in &rows {
+            let new_path = format!("{}{}", new_prefix, &old_path[old_norm.len()..]);
+            let new_parent = std::path::Path::new(&new_path)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let new_folder_name = std::path::Path::new(&new_path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            conn.execute(
+                "UPDATE galleries SET path = ?1, parent_path = ?2, folder_name = ?3 WHERE id = ?4",
+                params![new_path, new_parent, new_folder_name, id],
+            )?;
+
+            // Update FTS
+            conn.execute(
+                "INSERT OR REPLACE INTO galleries_fts(rowid, title_en, title_jp, folder_name)
+                 SELECT id, title_en, title_jp, folder_name FROM galleries WHERE id = ?1",
+                params![id],
+            )?;
+
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
+    /// Delete all galleries under a given path (exact match or children).
+    /// Returns the list of (id, thumb_path) for cleanup.
+    pub fn delete_galleries_under_path(&self, path: &str) -> SqlResult<Vec<(i64, String)>> {
+        let conn = self.conn.lock().unwrap();
+        let norm = path.replace('\\', "/");
+        let pattern = format!("{}/%", norm);
+
+        // Collect galleries to delete
+        let mut stmt = conn.prepare(
+            "SELECT id, thumb_path FROM galleries WHERE path = ?1 OR path LIKE ?2 OR parent_path = ?3 OR parent_path LIKE ?4",
+        )?;
+        let deleted: Vec<(i64, String)> = stmt
+            .query_map(params![norm, pattern, norm, pattern], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        for (id, _) in &deleted {
+            conn.execute("DELETE FROM galleries_fts WHERE rowid = ?1", params![id])?;
+            conn.execute("DELETE FROM galleries WHERE id = ?1", params![id])?;
+        }
+
+        Ok(deleted)
+    }
+
     pub fn update_thumb_path(&self, gallery_id: i64, thumb_path: &str) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(

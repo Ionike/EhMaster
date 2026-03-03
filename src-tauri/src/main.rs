@@ -14,6 +14,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .setup(|app| {
             // Get app data directory for DB and cache
             let data_dir = app
@@ -90,6 +91,8 @@ fn main() {
             commands::get_asset_url,
             commands::get_duplicate_galleries,
             commands::delete_gallery,
+            commands::move_folders,
+            commands::delete_gallery_folder,
             commands::clear_cache,
             commands::read_thumb,
             commands::refresh_gallery,
