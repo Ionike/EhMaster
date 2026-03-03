@@ -20,6 +20,8 @@ Galleries are resizeble in settings.
 
 A splitter is provided to dynamically adjust the panel size.
 
+A tag refresher to manually refresh all of the EH tags(Requires internet connection. might take very long time)
+
 Features(old image):
 ![unnamed](https://github.com/user-attachments/assets/21b9ea8b-ff31-44e6-8864-789119d80658)
 
@@ -89,6 +91,16 @@ The search bar at the top supports both free-text search and structured tag quer
 - `group:type-moon artist:takeuchi` -- combine multiple filters
 
 You can also click on any tag in a gallery's detail view to instantly search for it.
+
+### Pending: 
+#### High priority:
+ExHentai direct website access and downloader
+Local favorites
+#### Low priority:
+Buildin image reader
+Performance optimize on very large galleries on low spec device(trying to get my old surface go work)
+drag&drop(working on touch devices compatibility)
+Multiplatform support
 
 ### Refreshing Metadata from ExHentai
 
