@@ -116,11 +116,11 @@ export class SearchController {
     async loadMore(offset) {
         if (!this.currentQuery || this.isSearching) return null;
 
-        this.currentQuery.offset = offset;
+        const query = { ...this.currentQuery, offset };
         this.isSearching = true;
 
         try {
-            const result = await api.searchGalleries(this.currentQuery);
+            const result = await api.searchGalleries(query);
             return result;
         } catch (err) {
             console.error('Search loadMore error:', err);

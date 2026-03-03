@@ -59,13 +59,13 @@ export class GalleryView {
         if (this.titlePref === 'jp') {
             // JP first (large), EN second (small)
             const primaryTitle = document.createElement('div');
-            primaryTitle.className = 'gv-title-en';
+            primaryTitle.className = 'gv-title-jp';
             primaryTitle.textContent = gallery.title_jp || gallery.title_en || gallery.folder_name;
             titles.appendChild(primaryTitle);
 
             if (gallery.title_en && gallery.title_jp) {
                 const secondaryTitle = document.createElement('div');
-                secondaryTitle.className = 'gv-title-jp';
+                secondaryTitle.className = 'gv-title-en';
                 secondaryTitle.textContent = gallery.title_en;
                 titles.appendChild(secondaryTitle);
             }
@@ -140,6 +140,8 @@ export class GalleryView {
                     await this.load(gallery.id);
                 } catch (err) {
                     console.error('[Refresh] Error:', err);
+                    // Button may have been detached if user navigated away
+                    if (!refreshBtn.parentElement) return;
                     const errMsg = String(err);
                     refreshBtn.textContent = 'Failed';
                     refreshBtn.title = errMsg;
@@ -153,6 +155,7 @@ export class GalleryView {
                     }
                     errEl.textContent = errMsg;
                     setTimeout(() => {
+                        if (!refreshBtn.parentElement) return;
                         refreshBtn.disabled = false;
                         refreshBtn.textContent = 'Refresh';
                         refreshBtn.title = 'Re-fetch metadata from ExHentai';
@@ -239,7 +242,7 @@ export class GalleryView {
 
             const num = document.createElement('div');
             num.className = 'gv-page-num';
-            num.textContent = page.index + 1;
+            num.textContent = (page.index != null ? page.index : 0) + 1;
 
             pageEl.appendChild(img);
             pageEl.appendChild(num);

@@ -31,6 +31,7 @@ export class VirtualGrid {
         // Track which gallery indices are known to be wide (detected on image load)
         this._wideSet = new Set();
         this._relayoutTimer = null;
+        this._generation = 0; // incremented on setItems to detect stale onload callbacks
 
         this.titlePref = options.titlePref || 'en';
         this.onGalleryClick = options.onGalleryClick || (() => {});
@@ -62,6 +63,7 @@ export class VirtualGrid {
         this.cardWidth = cardWidth + this.gap;
         // thumb aspect-ratio is 5/7, card-info ~50px, border ~4px, gap 16px
         this.cardHeight = Math.round(cardWidth * 1.4) + 70;
+        if (this._relayoutTimer) { cancelAnimationFrame(this._relayoutTimer); this._relayoutTimer = null; }
         this.pool.forEach(node => node.remove());
         this.pool.clear();
         this._layout();
@@ -74,6 +76,8 @@ export class VirtualGrid {
         this.items = galleries;
         this.folders = folders;
         this._wideSet.clear();
+        this._generation++;
+        if (this._relayoutTimer) { cancelAnimationFrame(this._relayoutTimer); this._relayoutTimer = null; }
         this.pool.forEach(node => node.remove());
         this.pool.clear();
         this.container.scrollTop = 0;
@@ -118,7 +122,7 @@ export class VirtualGrid {
     _updateSelectionVisuals() {
         for (const [key, node] of this.pool) {
             if (key.startsWith('f_')) continue;
-            const idx = parseInt(key);
+            const idx = parseInt(key, 10);
             const gallery = this.items[idx];
             if (gallery && this.selectedGalleries.has(gallery.path)) {
                 node.classList.add('selected');
@@ -316,7 +320,7 @@ export class VirtualGrid {
         // Remove out-of-range gallery nodes
         for (const [key, node] of this.pool) {
             if (key.startsWith('f_')) continue;
-            const idx = parseInt(key);
+            const idx = parseInt(key, 10);
             if (!visibleIndices.has(idx)) {
                 node.remove();
                 this.pool.delete(key);
@@ -355,21 +359,23 @@ export class VirtualGrid {
             const img = document.createElement('img');
             img.alt = gallery.title_en || gallery.folder_name;
             thumb.appendChild(img);
+            const gen = this._generation;
+            img.onload = () => {
+                if (gen !== this._generation) return; // items changed, ignore stale load
+                if (img.naturalWidth > img.naturalHeight) {
+                    this._markWide(index);
+                }
+            };
+            img.onerror = () => {
+                this._showPlaceholder(thumb, img);
+            };
             loadThumb(gallery.thumb_path).then(dataUrl => {
                 if (dataUrl) {
                     img.src = dataUrl;
-                    img.onload = () => {
-                        if (img.naturalWidth > img.naturalHeight) {
-                            this._markWide(index);
-                        }
-                    };
                 } else {
                     this._showPlaceholder(thumb, img);
                 }
             });
-            img.onerror = () => {
-                this._showPlaceholder(thumb, img);
-            };
         } else {
             this._appendPlaceholder(thumb);
         }
@@ -491,6 +497,7 @@ export class VirtualGrid {
     }
 
     destroy() {
+        if (this._relayoutTimer) { cancelAnimationFrame(this._relayoutTimer); this._relayoutTimer = null; }
         this.container.removeEventListener('scroll', this._scrollHandler);
         if (this._resizeObserver) this._resizeObserver.disconnect();
         this.pool.forEach(node => node.remove());

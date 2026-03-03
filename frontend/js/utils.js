@@ -87,9 +87,9 @@ export function parseSearchInput(input) {
  */
 export function getDisplayTitle(gallery, pref) {
     if (pref === 'jp') {
-        return gallery.title_jp || gallery.title_en || gallery.folder_name;
+        return gallery.title_jp || gallery.title_en || gallery.folder_name || '';
     }
-    return gallery.title_en || gallery.folder_name;
+    return gallery.title_en || gallery.folder_name || '';
 }
 
 /**

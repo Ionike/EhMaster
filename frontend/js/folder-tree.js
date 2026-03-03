@@ -111,9 +111,11 @@ export class FolderTree {
             this.onFolderSelect(np);
         });
 
-        // Auto-load if already expanded
+        // Auto-load if already expanded (fire-and-forget but catch errors)
         if (this.expandedPaths.has(np) && children.children.length === 0) {
-            this.loadChildren(np, children);
+            this.loadChildren(np, children).catch(err => {
+                console.error('Auto-load children failed:', err);
+            });
         }
 
         return node;

@@ -124,11 +124,17 @@ export function assetUrl(filePath) {
  * Uses an in-memory cache to avoid redundant IPC calls.
  */
 const _thumbCache = new Map();
+const _THUMB_CACHE_MAX = 500;
 export async function loadThumb(filePath) {
     if (!filePath) return '';
     if (_thumbCache.has(filePath)) return _thumbCache.get(filePath);
     try {
         const dataUrl = await api.readThumb(filePath);
+        // Evict oldest entries when cache exceeds limit
+        if (_thumbCache.size >= _THUMB_CACHE_MAX) {
+            const firstKey = _thumbCache.keys().next().value;
+            _thumbCache.delete(firstKey);
+        }
         _thumbCache.set(filePath, dataUrl);
         return dataUrl;
     } catch (e) {

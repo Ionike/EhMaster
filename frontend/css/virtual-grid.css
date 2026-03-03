@@ -177,7 +177,6 @@
 /* Folder card (for folders in the grid) */
 .folder-card {
     position: absolute;
-    width: 200px;
     cursor: pointer;
     transition: border-color 0.15s;
     border-radius: 6px;

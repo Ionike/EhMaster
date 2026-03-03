@@ -19,6 +19,9 @@ export class ContextMenu {
     }
 
     show(x, y, items) {
+        // Cancel any pending deferred listener attachment from a previous show()
+        if (this._deferTimer) { clearTimeout(this._deferTimer); this._deferTimer = null; }
+        this.hide();
         this.el.innerHTML = '';
 
         for (const item of items) {
@@ -60,7 +63,8 @@ export class ContextMenu {
         }
 
         // Defer listeners so the triggering right-click doesn't immediately close
-        setTimeout(() => {
+        this._deferTimer = setTimeout(() => {
+            this._deferTimer = null;
             document.addEventListener('click', this._onClickOutside, true);
             document.addEventListener('contextmenu', this._onClickOutside, true);
             document.addEventListener('keydown', this._onKeydown);
@@ -69,6 +73,7 @@ export class ContextMenu {
     }
 
     hide() {
+        if (this._deferTimer) { clearTimeout(this._deferTimer); this._deferTimer = null; }
         this.el.style.display = 'none';
         document.removeEventListener('click', this._onClickOutside, true);
         document.removeEventListener('contextmenu', this._onClickOutside, true);

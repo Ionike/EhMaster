@@ -14,17 +14,21 @@
     margin-bottom: 12px;
 }
 
-.gv-title-en {
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 4px;
+.gv-title-en,
+.gv-title-jp {
     word-break: break-word;
 }
 
-.gv-title-jp {
+/* Primary title (first child) is large; secondary (second child) is small */
+.gv-titles > :first-child {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.gv-titles > :nth-child(2) {
     font-size: 14px;
     color: var(--text-secondary);
-    word-break: break-word;
 }
 
 .gv-meta {

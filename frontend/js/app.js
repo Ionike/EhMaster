@@ -311,14 +311,19 @@ class App {
             this.toggleTitlePref();
         });
 
-        // Grid size slider
+        // Grid size slider (debounced to avoid DOM thrashing during drag)
         const gridSlider = document.getElementById('grid-size-slider');
         const gridSizeLabel = document.getElementById('grid-size-value');
         if (gridSlider) {
+            let gridResizeRaf = null;
             gridSlider.addEventListener('input', () => {
                 const w = parseInt(gridSlider.value, 10);
                 gridSizeLabel.textContent = `${w}px`;
-                this.virtualGrid.setCardSize(w);
+                if (gridResizeRaf) cancelAnimationFrame(gridResizeRaf);
+                gridResizeRaf = requestAnimationFrame(() => {
+                    gridResizeRaf = null;
+                    this.virtualGrid.setCardSize(w);
+                });
             });
             gridSlider.addEventListener('change', () => {
                 const w = parseInt(gridSlider.value, 10);
@@ -416,12 +421,19 @@ class App {
                     await api.startScan(next);
                 } catch (err) {
                     console.error('Queued scan error:', err);
-                    // Failed to start next scan — process remaining queue
-                    // by re-emitting logic, or just hide overlay if queue is empty
-                    if (this._scanQueue.length === 0) {
-                        this.scanOverlay.classList.add('hidden');
-                        this._refreshCurrentView();
+                    // Failed to start next scan — try remaining queue items
+                    while (this._scanQueue.length > 0) {
+                        const fallback = this._scanQueue.shift();
+                        try {
+                            await api.startScan(fallback);
+                            return; // successfully started, wait for next scan-complete
+                        } catch (e2) {
+                            console.error('Queued scan error:', e2);
+                        }
                     }
+                    // All remaining scans failed — hide overlay
+                    this.scanOverlay.classList.add('hidden');
+                    this._refreshCurrentView();
                 }
                 return;
             }
@@ -536,10 +548,10 @@ class App {
             let va, vb;
             switch (sortBy) {
                 case 'rating':
-                    va = a.rating; vb = b.rating;
+                    va = a.rating || 0; vb = b.rating || 0;
                     break;
                 case 'pages':
-                    va = a.page_count; vb = b.page_count;
+                    va = a.page_count || 0; vb = b.page_count || 0;
                     break;
                 case 'title':
                     va = getDisplayTitle(a, this.titlePref).toLowerCase();
@@ -547,8 +559,8 @@ class App {
                     break;
                 default:
                     // scanned_at/posted not available in summary, fall back to folder name
-                    va = a.folder_name.toLowerCase();
-                    vb = b.folder_name.toLowerCase();
+                    va = (a.folder_name || '').toLowerCase();
+                    vb = (b.folder_name || '').toLowerCase();
                     break;
             }
             if (va < vb) return -dir;
@@ -796,7 +808,11 @@ class App {
                 }
             }
         } catch (err) {
-            this.duplicatesBody.innerHTML = `<p class="dup-empty">Error: ${err}</p>`;
+            const errP = document.createElement('p');
+            errP.className = 'dup-empty';
+            errP.textContent = `Error: ${err}`;
+            this.duplicatesBody.innerHTML = '';
+            this.duplicatesBody.appendChild(errP);
         }
     }
 
@@ -831,7 +847,7 @@ class App {
 
             const meta = document.createElement('div');
             meta.className = 'dup-meta';
-            meta.textContent = `${gallery.page_count} pages | ${gallery.rating.toFixed(1)} | ${gallery.category}`;
+            meta.textContent = `${gallery.page_count || 0} pages | ${(gallery.rating || 0).toFixed(1)} | ${gallery.category || ''}`;
 
             info.appendChild(title);
             info.appendChild(path);
@@ -984,14 +1000,15 @@ class App {
         // Update title toggle button
         this._updateTitleToggleBtn();
 
-        // Update grid size slider and sync grid
+        // Update grid size slider (only apply if value actually changed)
         try {
             const w = await api.getGridCardWidth();
             const slider = document.getElementById('grid-size-slider');
             const label = document.getElementById('grid-size-value');
             if (slider) slider.value = w;
             if (label) label.textContent = `${w}px`;
-            if (w >= 150 && w <= 400) {
+            const currentW = this.virtualGrid.cardWidth - this.virtualGrid.gap;
+            if (w >= 150 && w <= 400 && w !== currentW) {
                 this.virtualGrid.setCardSize(w);
             }
         } catch (_) {}
