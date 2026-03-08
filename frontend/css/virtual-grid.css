@@ -81,6 +81,8 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
     position: relative;
     padding: 16px;
     min-height: 0;

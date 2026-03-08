@@ -8,7 +8,7 @@ name = "eh_master_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [[bin]]
-name = "eh-master"
+name = "EhMaster"
 path = "src/main.rs"
 
 [dependencies]

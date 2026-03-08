@@ -523,6 +523,7 @@ class App {
     /**
      * Refresh the current folder view without disrupting the gallery detail view.
      * If the user is reading a gallery, the refresh is deferred until they go back.
+     * Debounced so rapid watcher events don't cancel each other's in-flight loads.
      */
     _refreshCurrentView() {
         if (!this.galleryViewEl.classList.contains('hidden')) {
@@ -531,10 +532,14 @@ class App {
             this.folderTree.loadRoots();
             return;
         }
-        if (this.currentPath && !this.isSearchMode) {
-            this.navigateToFolder(this.currentPath);
-        }
-        this.folderTree.loadRoots();
+        if (this._refreshTimer) clearTimeout(this._refreshTimer);
+        this._refreshTimer = setTimeout(() => {
+            this._refreshTimer = null;
+            if (this.currentPath && !this.isSearchMode) {
+                this.navigateToFolder(this.currentPath);
+            }
+            this.folderTree.loadRoots();
+        }, 300);
     }
 
     /**
