@@ -121,6 +121,13 @@ class App {
 
     // --- Selection & Context Menu ---
 
+    _updateGridCount() {
+        this._lastGridCount = `${this.virtualGrid.items.length} galleries, ${this.virtualGrid.folders.length} folders`;
+        if (this.virtualGrid.selectedGalleries.size === 0) {
+            this.gridCount.textContent = this._lastGridCount;
+        }
+    }
+
     _onSelectionChange(sel) {
         if (sel.size > 0) {
             this.gridCount.textContent = `${sel.size} selected`;
@@ -179,7 +186,9 @@ class App {
         try {
             await api.moveFolders(paths, folder);
             this.virtualGrid.clearSelection();
-            this._refreshCurrentView();
+            this.virtualGrid.removeItemsByPath(paths);
+            this._updateGridCount();
+            this.folderTree.loadRoots();
         } catch (err) {
             alert(`Move failed: ${err}`);
         }
@@ -205,8 +214,11 @@ class App {
                     await api.deleteGalleryFolder(g.path);
                 }
             }
+            const paths = galleries.map(g => g.path).filter(Boolean);
             this.virtualGrid.clearSelection();
-            this._refreshCurrentView();
+            this.virtualGrid.removeItemsByPath(paths);
+            this._updateGridCount();
+            this.folderTree.loadRoots();
         } catch (err) {
             alert(`Delete failed: ${err}`);
         }
@@ -557,6 +569,9 @@ class App {
                     break;
                 case 'pages':
                     va = a.page_count || 0; vb = b.page_count || 0;
+                    break;
+                case 'date_modified':
+                    va = a.date_modified || 0; vb = b.date_modified || 0;
                     break;
                 case 'title':
                     va = getDisplayTitle(a, this.titlePref).toLowerCase();

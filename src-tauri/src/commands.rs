@@ -97,12 +97,22 @@ pub async fn get_folder_children(
             continue;
         }
 
+        // Get folder modification time
+        let date_modified = entry_path
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0);
+
         // Check if this folder is a gallery (contains info.txt)
         let info_path = entry_path.join("info.txt");
         if info_path.exists() {
             // It's a gallery - get from DB or create a summary from folder name
             let path_str = normalize_path(&entry_path);
-            if let Ok(Some(summary)) = state.db.get_gallery_by_path(&path_str) {
+            if let Ok(Some(mut summary)) = state.db.get_gallery_by_path(&path_str) {
+                summary.date_modified = date_modified;
                 galleries.push(summary);
             } else {
                 // Not yet scanned - return basic info
@@ -116,6 +126,7 @@ pub async fn get_folder_children(
                     thumb_path: String::new(),
                     folder_name: name,
                     path: path_str,
+                    date_modified,
                 });
             }
         } else {

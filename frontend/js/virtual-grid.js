@@ -145,6 +145,26 @@ export class VirtualGrid {
     }
 
     /**
+     * Remove items by path without resetting scroll position.
+     * Used after delete/move to keep the user at their current location.
+     */
+    removeItemsByPath(paths) {
+        const pathSet = new Set(paths);
+        this.items = this.items.filter(g => !pathSet.has(g.path));
+        // Remove from wide set (indices shifted)
+        this._wideSet.clear();
+        this._generation++;
+        if (this._relayoutTimer) { cancelAnimationFrame(this._relayoutTimer); this._relayoutTimer = null; }
+        const scrollTop = this.container.scrollTop;
+        this.pool.forEach(node => node.remove());
+        this.pool.clear();
+        this._layout();
+        // Clamp scroll to new content height, then restore
+        const maxScroll = this.sentinel.scrollHeight - this.container.clientHeight;
+        this.container.scrollTop = Math.min(scrollTop, Math.max(0, maxScroll));
+    }
+
+    /**
      * Called when a thumbnail finishes loading and is detected as wide.
      * Batches re-layouts so multiple detections in quick succession
      * only trigger one reflow.

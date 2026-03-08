@@ -31,6 +31,8 @@ pub struct GallerySummary {
     pub thumb_path: String,
     pub folder_name: String,
     pub path: String,
+    #[serde(default)]
+    pub date_modified: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
