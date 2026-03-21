@@ -272,6 +272,7 @@ export class GalleryView {
             pageEl.className = 'gv-page';
 
             const img = document.createElement('img');
+            img.decoding = 'async';
             img.loading = 'lazy';
             img.src = assetUrl(page.path);
             img.alt = page.filename;

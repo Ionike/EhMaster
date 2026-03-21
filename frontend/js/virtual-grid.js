@@ -48,7 +48,7 @@ export class VirtualGrid {
         this._ticking = false;
         this._resizeTicking = false;
 
-        this.container.addEventListener('scroll', this._scrollHandler);
+        this.container.addEventListener('scroll', this._scrollHandler, { passive: true });
 
         // Use ResizeObserver instead of window resize so splitter drags
         // and any other container-width changes trigger re-layout.
@@ -390,6 +390,7 @@ export class VirtualGrid {
         if (gallery.thumb_path) {
             // Load thumbnail via IPC (returns base64 data URL)
             const img = document.createElement('img');
+            img.decoding = 'async';
             img.alt = gallery.title_en || gallery.folder_name;
             thumb.appendChild(img);
             const gen = this._generation;
