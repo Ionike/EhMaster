@@ -83,6 +83,10 @@ body {
     align-items: center;
     gap: 8px;
     -webkit-app-region: no-drag;
+    /* Extend no-drag zone into topbar padding so button edges aren't
+       swallowed by the drag region */
+    padding: 8px 0 8px 12px;
+    margin: -8px 0 -8px -12px;
 }
 
 .topbar-center {
@@ -95,6 +99,8 @@ body {
     align-items: center;
     gap: 8px;
     -webkit-app-region: no-drag;
+    padding: 8px 12px 8px 0;
+    margin: -8px -12px -8px 0;
 }
 
 #search-input {
@@ -128,6 +134,7 @@ body {
     font-size: 14px;
     white-space: nowrap;
     transition: background 0.15s;
+    -webkit-app-region: no-drag;
 }
 
 .topbar-btn:hover {
@@ -142,9 +149,9 @@ body {
 /* Back button — larger hit target for touch */
 #btn-back {
     font-size: 20px;
-    padding: 6px 16px;
-    min-width: 44px;
-    min-height: 44px;
+    padding: 10px 20px;
+    min-width: 48px;
+    min-height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
