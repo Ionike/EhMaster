@@ -109,6 +109,14 @@ class App {
             }
         } catch (_) {}
 
+        // Load gallery card (page preview) size
+        try {
+            const w = await api.getGalleryCardWidth();
+            if (w >= 60 && w <= 300) {
+                this.galleryView.pageCardWidth = w;
+            }
+        } catch (_) {}
+
         const paths = await api.getRootPaths();
         if (paths.length > 0) {
             this.welcomeScreen.classList.add('hidden');
@@ -121,11 +129,31 @@ class App {
 
     // --- Selection & Context Menu ---
 
-    _updateGridCount() {
-        this._lastGridCount = `${this.virtualGrid.items.length} galleries, ${this.virtualGrid.folders.length} folders`;
-        if (this.virtualGrid.selectedGalleries.size === 0) {
-            this.gridCount.textContent = this._lastGridCount;
+    /**
+     * Find the nearest neighbor path of the given galleries in current grid order.
+     * Looks for the item just after the last removed item, or before the first if none after.
+     */
+    _findNeighborPath(galleries) {
+        const items = this.virtualGrid.items;
+        const removedPaths = new Set(galleries.map(g => g.path).filter(Boolean));
+        // Find min and max index of removed items
+        let minIdx = items.length, maxIdx = -1;
+        for (let i = 0; i < items.length; i++) {
+            if (removedPaths.has(items[i].path)) {
+                if (i < minIdx) minIdx = i;
+                if (i > maxIdx) maxIdx = i;
+            }
         }
+        if (maxIdx < 0) return null;
+        // Prefer the item right after the last removed one
+        for (let i = maxIdx + 1; i < items.length; i++) {
+            if (!removedPaths.has(items[i].path)) return items[i].path;
+        }
+        // Otherwise the item right before the first removed one
+        for (let i = minIdx - 1; i >= 0; i--) {
+            if (!removedPaths.has(items[i].path)) return items[i].path;
+        }
+        return null;
     }
 
     _onSelectionChange(sel) {
@@ -184,11 +212,11 @@ class App {
         if (paths.length === 0) return;
 
         try {
+            const neighbor = this._findNeighborPath(galleries);
             await api.moveFolders(paths, folder);
             this.virtualGrid.clearSelection();
-            this.virtualGrid.removeItemsByPath(paths);
-            this._updateGridCount();
-            this.folderTree.loadRoots();
+            if (neighbor) this.virtualGrid.setScrollTarget(neighbor);
+            this._refreshCurrentView();
         } catch (err) {
             alert(`Move failed: ${err}`);
         }
@@ -207,6 +235,7 @@ class App {
         if (!ok) return;
 
         try {
+            const neighbor = this._findNeighborPath(galleries);
             for (const g of galleries) {
                 if (g.id && g.id > 0) {
                     await api.deleteGallery(g.id);
@@ -214,11 +243,9 @@ class App {
                     await api.deleteGalleryFolder(g.path);
                 }
             }
-            const paths = galleries.map(g => g.path).filter(Boolean);
             this.virtualGrid.clearSelection();
-            this.virtualGrid.removeItemsByPath(paths);
-            this._updateGridCount();
-            this.folderTree.loadRoots();
+            if (neighbor) this.virtualGrid.setScrollTarget(neighbor);
+            this._refreshCurrentView();
         } catch (err) {
             alert(`Delete failed: ${err}`);
         }
@@ -564,21 +591,17 @@ class App {
         galleries.sort((a, b) => {
             let va, vb;
             switch (sortBy) {
-                case 'rating':
-                    va = a.rating || 0; vb = b.rating || 0;
-                    break;
-                case 'pages':
-                    va = a.page_count || 0; vb = b.page_count || 0;
-                    break;
                 case 'date_modified':
                     va = a.date_modified || 0; vb = b.date_modified || 0;
+                    break;
+                case 'date_created':
+                    va = a.date_created || 0; vb = b.date_created || 0;
                     break;
                 case 'title':
                     va = getDisplayTitle(a, this.titlePref).toLowerCase();
                     vb = getDisplayTitle(b, this.titlePref).toLowerCase();
                     break;
                 default:
-                    // scanned_at/posted not available in summary, fall back to folder name
                     va = (a.folder_name || '').toLowerCase();
                     vb = (b.folder_name || '').toLowerCase();
                     break;

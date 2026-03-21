@@ -10,6 +10,7 @@ export class GalleryView {
         this.titlePref = options.titlePref || 'en';
         this.onTagClick = options.onTagClick || (() => {});
         this.onBack = options.onBack || (() => {});
+        this.pageCardWidth = 150;
     }
 
     /**
@@ -226,9 +227,45 @@ export class GalleryView {
 
         this.container.appendChild(header);
 
+        // Pages toolbar (size slider)
+        const toolbar = document.createElement('div');
+        toolbar.className = 'gv-toolbar';
+
+        const sliderLabel = document.createElement('span');
+        sliderLabel.className = 'gv-toolbar-label';
+        sliderLabel.textContent = 'Card size';
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '60';
+        slider.max = '300';
+        slider.step = '1';
+        slider.value = this.pageCardWidth;
+        slider.className = 'gv-size-slider';
+
+        const sliderValue = document.createElement('span');
+        sliderValue.className = 'gv-toolbar-label';
+        sliderValue.textContent = `${this.pageCardWidth}px`;
+
+        toolbar.appendChild(sliderLabel);
+        toolbar.appendChild(slider);
+        toolbar.appendChild(sliderValue);
+        this.container.appendChild(toolbar);
+
         // Pages grid
         const pagesGrid = document.createElement('div');
         pagesGrid.className = 'gv-pages';
+        pagesGrid.style.setProperty('--gv-card-w', `${this.pageCardWidth}px`);
+
+        slider.addEventListener('input', () => {
+            const w = parseInt(slider.value, 10);
+            this.pageCardWidth = w;
+            sliderValue.textContent = `${w}px`;
+            pagesGrid.style.setProperty('--gv-card-w', `${w}px`);
+        });
+        slider.addEventListener('change', () => {
+            api.setGalleryCardWidth(parseInt(slider.value, 10)).catch(() => {});
+        });
 
         for (const page of pages) {
             const pageEl = document.createElement('div');

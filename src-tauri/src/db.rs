@@ -247,6 +247,7 @@ impl Database {
                     folder_name: row.get(7)?,
                     path: row.get(8)?,
                     date_modified: 0.0,
+                    date_created: 0.0,
                 })
             })
             .ok();
@@ -294,6 +295,7 @@ impl Database {
                     folder_name: row.get(7)?,
                     path: row.get(8)?,
                     date_modified: 0.0,
+                    date_created: 0.0,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -425,6 +427,7 @@ impl Database {
                     folder_name: row.get(7)?,
                     path: row.get(8)?,
                     date_modified: 0.0,
+                    date_created: 0.0,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -476,6 +479,7 @@ impl Database {
                         folder_name: row.get(7)?,
                         path: row.get(8)?,
                         date_modified: 0.0,
+                    date_created: 0.0,
                     })
                 })?
                 .filter_map(|r| r.ok())
@@ -517,6 +521,7 @@ impl Database {
                         folder_name: row.get(7)?,
                         path: row.get(8)?,
                         date_modified: 0.0,
+                    date_created: 0.0,
                     })
                 })?
                 .filter_map(|r| r.ok())

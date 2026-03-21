@@ -33,6 +33,8 @@ pub struct GallerySummary {
     pub path: String,
     #[serde(default)]
     pub date_modified: f64,
+    #[serde(default)]
+    pub date_created: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +112,8 @@ pub struct AppSettings {
     pub title_pref: String,
     #[serde(default = "default_grid_card_width")]
     pub grid_card_width: u32,
+    #[serde(default = "default_gallery_card_width")]
+    pub gallery_card_width: u32,
 }
 
 fn default_title_pref() -> String {
@@ -118,6 +122,10 @@ fn default_title_pref() -> String {
 
 fn default_grid_card_width() -> u32 {
     200
+}
+
+fn default_gallery_card_width() -> u32 {
+    150
 }
 
 impl Default for AppSettings {
@@ -129,6 +137,7 @@ impl Default for AppSettings {
             cookie_path: String::new(),
             title_pref: "en".to_string(),
             grid_card_width: 200,
+            gallery_card_width: 150,
         }
     }
 }

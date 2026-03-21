@@ -109,6 +109,14 @@ export const api = {
     getGridCardWidth() {
         return invoke('get_grid_card_width');
     },
+
+    setGalleryCardWidth(width) {
+        return invoke('set_gallery_card_width', { width });
+    },
+
+    getGalleryCardWidth() {
+        return invoke('get_gallery_card_width');
+    },
 };
 
 /**

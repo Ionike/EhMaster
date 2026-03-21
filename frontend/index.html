@@ -56,13 +56,12 @@
                             <button id="btn-move-selected" class="topbar-btn hidden" title="Move selected to...">Move</button>
                             <button id="btn-select-mode" class="topbar-btn" title="Toggle selection mode">&#9745;</button>
                             <select id="sort-select">
-                                <option value="scanned_at:desc">Recently Added</option>
-                                <option value="date_modified:desc">Date Modified</option>
-                                <option value="title:asc">Title A-Z</option>
-                                <option value="title:desc">Title Z-A</option>
-                                <option value="rating:desc">Rating</option>
-                                <option value="posted:desc">Date Posted</option>
-                                <option value="pages:desc">Most Pages</option>
+                                <option value="date_modified:desc">Date Modified ↓</option>
+                                <option value="date_modified:asc">Date Modified ↑</option>
+                                <option value="title:asc">Name A-Z</option>
+                                <option value="title:desc">Name Z-A</option>
+                                <option value="date_created:desc">Date Created ↓</option>
+                                <option value="date_created:asc">Date Created ↑</option>
                             </select>
                         </div>
                     </div>
@@ -107,7 +106,7 @@
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
                         <span style="font-size: 13px; color: var(--text-secondary);">Grid Card Size</span>
-                        <input type="range" id="grid-size-slider" min="150" max="400" step="10" value="200" style="flex: 1; cursor: pointer;">
+                        <input type="range" id="grid-size-slider" min="150" max="400" step="1" value="200" style="flex: 1; cursor: pointer;">
                         <span id="grid-size-value" style="font-size: 13px; color: var(--text-secondary); min-width: 40px;">200px</span>
                     </div>
 

@@ -80,9 +80,23 @@ export class VirtualGrid {
         if (this._relayoutTimer) { cancelAnimationFrame(this._relayoutTimer); this._relayoutTimer = null; }
         this.pool.forEach(node => node.remove());
         this.pool.clear();
-        this.container.scrollTop = 0;
         this.clearSelection();
         this._layout();
+
+        // Scroll to pending target or reset to top
+        const target = this._pendingScrollTarget;
+        this._pendingScrollTarget = null;
+        if (target) {
+            const idx = this.items.findIndex(g => g.path === target);
+            if (idx >= 0 && this._layoutPositions[idx]) {
+                const pos = this._layoutPositions[idx];
+                this.container.scrollTop = this._folderHeight + pos.row * this.cardHeight;
+            } else {
+                this.container.scrollTop = 0;
+            }
+        } else {
+            this.container.scrollTop = 0;
+        }
     }
 
     /**
@@ -145,23 +159,11 @@ export class VirtualGrid {
     }
 
     /**
-     * Remove items by path without resetting scroll position.
-     * Used after delete/move to keep the user at their current location.
+     * Set a path to scroll to on the next setItems call.
+     * After setItems lays out, it scrolls so that item is near the top.
      */
-    removeItemsByPath(paths) {
-        const pathSet = new Set(paths);
-        this.items = this.items.filter(g => !pathSet.has(g.path));
-        // Remove from wide set (indices shifted)
-        this._wideSet.clear();
-        this._generation++;
-        if (this._relayoutTimer) { cancelAnimationFrame(this._relayoutTimer); this._relayoutTimer = null; }
-        const scrollTop = this.container.scrollTop;
-        this.pool.forEach(node => node.remove());
-        this.pool.clear();
-        this._layout();
-        // Clamp scroll to new content height, then restore
-        const maxScroll = this.sentinel.scrollHeight - this.container.clientHeight;
-        this.container.scrollTop = Math.min(scrollTop, Math.max(0, maxScroll));
+    setScrollTarget(path) {
+        this._pendingScrollTarget = path;
     }
 
     /**
@@ -362,7 +364,18 @@ export class VirtualGrid {
         const pos = this._layoutPositions[index];
         const x = this.gap + pos.col * this.cardWidth;
         const y = this._folderHeight + pos.row * this.cardHeight;
-        const cardW = pos.colSpan * this.cardWidth - this.gap;
+        let cardW = pos.colSpan * this.cardWidth - this.gap;
+
+        // Wide cards span 2 columns, absorbing the gap between them. This makes
+        // their thumb (aspect-ratio 10/7) taller than a normal card's thumb, causing
+        // them to overflow into the next row. Cap the width so the thumb height
+        // never exceeds the available space in the row (rowHeight - gap - infoArea).
+        if (pos.colSpan > 1) {
+            const infoH = Math.round((this.cardWidth - this.gap) * 0.25);
+            const thumbMaxH = this.cardHeight - this.gap - infoH;
+            const maxWideW = Math.floor(thumbMaxH * (10 / 7));
+            if (cardW > maxWideW) cardW = maxWideW;
+        }
 
         const card = document.createElement('div');
         card.className = pos.colSpan > 1 ? 'gallery-card gallery-card-wide' : 'gallery-card';

@@ -97,11 +97,17 @@ pub async fn get_folder_children(
             continue;
         }
 
-        // Get folder modification time
-        let date_modified = entry_path
-            .metadata()
-            .and_then(|m| m.modified())
-            .ok()
+        // Get folder modification and creation time
+        let meta = entry_path.metadata().ok();
+        let date_modified = meta
+            .as_ref()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0);
+        let date_created = meta
+            .as_ref()
+            .and_then(|m| m.created().ok())
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_secs_f64())
             .unwrap_or(0.0);
@@ -113,6 +119,7 @@ pub async fn get_folder_children(
             let path_str = normalize_path(&entry_path);
             if let Ok(Some(mut summary)) = state.db.get_gallery_by_path(&path_str) {
                 summary.date_modified = date_modified;
+                summary.date_created = date_created;
                 galleries.push(summary);
             } else {
                 // Not yet scanned - return basic info
@@ -127,6 +134,7 @@ pub async fn get_folder_children(
                     folder_name: name,
                     path: path_str,
                     date_modified,
+                    date_created,
                 });
             }
         } else {
@@ -832,6 +840,26 @@ pub async fn set_grid_card_width(
 pub async fn get_grid_card_width(state: State<'_, AppState>) -> Result<u32, String> {
     let settings = state.settings.lock().unwrap();
     Ok(settings.grid_card_width)
+}
+
+#[tauri::command]
+pub async fn set_gallery_card_width(
+    width: u32,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    {
+        let mut settings = state.settings.lock().unwrap();
+        settings.gallery_card_width = width.clamp(60, 300);
+    }
+    save_settings(&state, &app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_gallery_card_width(state: State<'_, AppState>) -> Result<u32, String> {
+    let settings = state.settings.lock().unwrap();
+    Ok(settings.gallery_card_width)
 }
 
 fn urlencoding(s: &str) -> String {
