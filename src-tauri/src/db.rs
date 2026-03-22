@@ -538,14 +538,18 @@ impl Database {
     pub fn move_gallery_paths(&self, old_prefix: &str, new_prefix: &str) -> SqlResult<u64> {
         let conn = self.conn.lock().unwrap();
 
-        // Find affected galleries
+        // Find affected galleries — try both separator styles to handle
+        // any inconsistency between how paths were stored vs passed in.
         let mut stmt = conn.prepare(
-            "SELECT id, path FROM galleries WHERE path = ?1 OR path LIKE ?2",
+            "SELECT id, path FROM galleries WHERE path = ?1 OR path LIKE ?2
+             OR path = ?3 OR path LIKE ?4",
         )?;
-        let pattern = format!("{}/%", old_prefix.replace('\\', "/"));
-        let old_norm = old_prefix.replace('\\', "/");
+        let fwd = old_prefix.replace('\\', "/");
+        let bck = old_prefix.replace('/', "\\");
+        let fwd_pattern = format!("{}/%", fwd);
+        let bck_pattern = format!("{}\\%", bck);
         let rows: Vec<(i64, String)> = stmt
-            .query_map(params![old_norm, pattern], |row| {
+            .query_map(params![fwd, fwd_pattern, bck, bck_pattern], |row| {
                 Ok((row.get(0)?, row.get(1)?))
             })?
             .filter_map(|r| r.ok())
@@ -553,7 +557,15 @@ impl Database {
 
         let mut count = 0u64;
         for (id, old_path) in &rows {
-            let new_path = format!("{}{}", new_prefix, &old_path[old_norm.len()..]);
+            // Determine which prefix variant matches this stored path
+            let suffix = if old_path.starts_with(&fwd) {
+                &old_path[fwd.len()..]
+            } else if old_path.starts_with(&bck) {
+                &old_path[bck.len()..]
+            } else {
+                continue;
+            };
+            let new_path = format!("{}{}", new_prefix, suffix);
             let new_parent = std::path::Path::new(&new_path)
                 .parent()
                 .map(|p| p.to_string_lossy().to_string())

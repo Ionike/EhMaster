@@ -370,6 +370,22 @@ class App {
             });
         }
 
+        // Page card size slider
+        const pageSlider = document.getElementById('page-size-slider');
+        const pageSizeLabel = document.getElementById('page-size-value');
+        if (pageSlider) {
+            pageSlider.addEventListener('input', () => {
+                const w = parseInt(pageSlider.value, 10);
+                pageSizeLabel.textContent = `${w}px`;
+                this.galleryView.pageCardWidth = w;
+                this.galleryView.applyPageCardWidth();
+            });
+            pageSlider.addEventListener('change', () => {
+                const w = parseInt(pageSlider.value, 10);
+                api.setGalleryCardWidth(w).catch(() => {});
+            });
+        }
+
         // Batch refresh button
         document.getElementById('btn-refresh-all')?.addEventListener('click', () => {
             this.settingsModal.classList.add('hidden');
@@ -1053,6 +1069,18 @@ class App {
             const currentW = this.virtualGrid.cardWidth - this.virtualGrid.gap;
             if (w >= 150 && w <= 400 && w !== currentW) {
                 this.virtualGrid.setCardSize(w);
+            }
+        } catch (_) {}
+
+        // Update page card size slider
+        try {
+            const w = await api.getGalleryCardWidth();
+            const slider = document.getElementById('page-size-slider');
+            const label = document.getElementById('page-size-value');
+            if (slider) slider.value = w;
+            if (label) label.textContent = `${w}px`;
+            if (w >= 60 && w <= 300) {
+                this.galleryView.pageCardWidth = w;
             }
         } catch (_) {}
 
